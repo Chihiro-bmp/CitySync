@@ -3,14 +3,14 @@ const cors = require('cors');
 require('dotenv').config();
 
 const pool = require('./db/config');
-const apiRoutes = require('./routes/api');
-const authRoutes = require('./routes/auth');
-const adminRoutes = require('./routes/admin');
+const apiRoutes      = require('./routes/api');
+const authRoutes     = require('./routes/auth');
+const adminRoutes    = require('./routes/admin');
+const consumerRoutes = require('./routes/consumer'); // ← NEW
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3001',
   credentials: true
@@ -18,12 +18,11 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
-app.use('/api', apiRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api',          apiRoutes);
+app.use('/api/auth',     authRoutes);
+app.use('/api/admin',    adminRoutes);
+app.use('/api/consumer', consumerRoutes); // ← NEW
 
-// Health check route
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT NOW()');
@@ -33,8 +32,6 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Accessible on network at http://<your-ip>:${PORT}`);
 });
