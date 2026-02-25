@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { fonts } from '../theme';
 
 // ─── DONUT CHART ──────────────────────────────────────────────────────────────
-export const DonutChart = ({ segments, size = 180, thickness = 36, label, sublabel, t }) => {
+export const DonutChart = ({ segments, size = 180, thickness = 44, label, sublabel, t }) => {
   const [hovered, setHovered] = useState(null);
-  const r      = (size - thickness) / 2;
-  const cx     = size / 2;
-  const cy     = size / 2;
+
+  const GAP  = 3;           // white gap between segments in px of arc
+  const r    = (size - thickness) / 2;
+  const cx   = size / 2;
+  const cy   = size / 2;
   const circum = 2 * Math.PI * r;
   const total  = segments.reduce((s, g) => s + g.value, 0);
 
@@ -14,13 +16,14 @@ export const DonutChart = ({ segments, size = 180, thickness = 36, label, sublab
     <div style={{ width:size, height:size, display:'flex', alignItems:'center', justifyContent:'center', color:t.textMuted, fontSize:13 }}>No data</div>
   );
 
+  // Build slices with small arc gaps between them
   let offset = 0;
   const slices = segments.map((seg, i) => {
     const pct  = seg.value / total;
-    const dash = pct * circum;
+    const dash = Math.max(0, pct * circum - GAP);
     const gap  = circum - dash;
     const slice = { ...seg, dash, gap, offset, pct, index: i };
-    offset += dash;
+    offset += pct * circum;   // advance by full share (including gap)
     return slice;
   });
 
@@ -34,11 +37,16 @@ export const DonutChart = ({ segments, size = 180, thickness = 36, label, sublab
         {/* Segments */}
         {slices.map((s, i) => (
           <circle key={i} cx={cx} cy={cy} r={r} fill="none"
-            stroke={s.color} strokeWidth={hovered === i ? thickness + 4 : thickness}
+            stroke={s.color}
+            strokeWidth={hovered === i ? thickness + 5 : thickness}
             strokeDasharray={`${s.dash} ${s.gap}`}
             strokeDashoffset={-s.offset}
             strokeLinecap="butt"
-            style={{ transition:'stroke-width 0.2s', cursor:'pointer', filter: hovered === i ? `drop-shadow(0 0 6px ${s.color}88)` : 'none' }}
+            style={{
+              transition: 'stroke-width 0.2s, filter 0.2s',
+              cursor: 'pointer',
+              filter: hovered === i ? `drop-shadow(0 0 8px ${s.color}99)` : 'none',
+            }}
             onMouseEnter={() => setHovered(i)}
             onMouseLeave={() => setHovered(null)}
           />

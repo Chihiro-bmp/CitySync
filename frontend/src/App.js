@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { AvatarProvider } from './context/AvatarContext';
 import { ThemeProvider } from './components/Layout';
 import { Layout } from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -14,7 +15,10 @@ import ConsumerDashboard from './components/Consumer/ConsumerDashboard';
 import MyBills           from './components/Consumer/MyBills';
 import BillDetail        from './components/Consumer/BillDetail';
 import UsageHistory      from './components/Consumer/UsageHistory';
-import Complaints        from './components/Consumer/Complaints';
+import Complaints              from './components/Consumer/Complaints';
+import ConnectionApplications  from './components/Consumer/ConnectionApplications';
+import MyConnections           from './components/Consumer/Myconnections';
+import Profile                 from './components/Consumer/Profile';
 
 // Employee pages
 import RegionList from './components/Regions/RegionList';
@@ -35,6 +39,7 @@ const RootRedirect = () => {
 function App() {
   return (
     <AuthProvider>
+      <AvatarProvider>
       <ThemeProvider>
         <BrowserRouter>
           <Routes>
@@ -48,12 +53,15 @@ function App() {
               <ProtectedRoute roles={['consumer']}>
                 <Layout>
                   <Routes>
-                    <Route path="dashboard"  element={<ConsumerDashboard />} />
+                    <Route path="dashboard"    element={<ConsumerDashboard />} />
+                    <Route path="connections"  element={<MyConnections />} />
                     <Route path="bills"      element={<MyBills />} />
                     <Route path="bills/:id"  element={<BillDetail />} />
                     <Route path="usage"      element={<UsageHistory />} />
-                    <Route path="complaints" element={<Complaints />} />
-                    {/* TODO: payments, profile */}
+                    <Route path="complaints"   element={<Complaints />} />
+                    <Route path="applications" element={<ConnectionApplications />} />
+                    <Route path="profile"      element={<Profile />} />
+                    {/* TODO: payments */}
                     <Route path="*" element={<Navigate to="dashboard" replace />} />
                   </Routes>
                 </Layout>
@@ -93,6 +101,7 @@ function App() {
           </Routes>
         </BrowserRouter>
       </ThemeProvider>
+      </AvatarProvider>
     </AuthProvider>
   );
 }

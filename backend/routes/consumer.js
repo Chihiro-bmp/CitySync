@@ -290,3 +290,199 @@ router.post('/payments', async (req, res) => {
 });
 
 module.exports = router;
+
+// ── GET /api/consumer/applications ───────────────────────────────────────────
+router.get('/applications', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        ca.application_id,
+        ca.utility_type,
+        ca.application_date,
+        ca.status,
+        ca.requested_connection_type,
+        ca.address,
+        ca.review_date,
+        ca.approval_date,
+        ca.priority,
+        p.first_name || ' ' || p.last_name AS reviewed_by_name
+      FROM connection_application ca
+      LEFT JOIN employee e  ON ca.reviewed_by = e.person_id
+      LEFT JOIN person   p  ON e.person_id    = p.person_id
+      WHERE ca.consumer_id = $1
+      ORDER BY ca.application_date DESC
+    `, [req.user.userId]);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch applications' });
+  }
+});
+
+// ── POST /api/consumer/applications ──────────────────────────────────────────
+router.post('/applications', async (req, res) => {
+  const { utility_type, requested_connection_type, address, priority } = req.body;
+
+  if (!utility_type || !requested_connection_type || !address)
+    return res.status(400).json({ error: 'utility_type, requested_connection_type and address are required' });
+
+  try {
+    const result = await pool.query(`
+      INSERT INTO connection_application
+        (consumer_id, utility_type, requested_connection_type, address, priority, status, application_date)
+      VALUES ($1, $2, $3, $4, $5, 'Pending', CURRENT_DATE)
+      RETURNING *
+    `, [req.user.userId, utility_type, requested_connection_type, address, priority || 'Normal']);
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to submit application' });
+  }
+});
+
+// ── GET /api/consumer/profile ─────────────────────────────────────────────────
+router.get('/profile', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        p.person_id,
+        p.first_name,
+        p.last_name,
+        p.phone_number,
+        p.national_id,
+        p.date_of_birth,
+        p.gender,
+        a.email,
+        a.account_type   AS role,
+        a.created_at,
+        a.avatar_b64,
+        c.consumer_type,
+        c.registration_date,
+        addr.house_num,
+        addr.street_name,
+        addr.landmark,
+        r.region_name,
+        r.postal_code,
+        -- Stats
+        (SELECT COUNT(*) FROM utility_connection uc WHERE uc.consumer_id = p.person_id)               AS total_connections,
+        (SELECT COUNT(*) FROM utility_connection uc
+          JOIN bill_document bd ON bd.connection_id = uc.connection_id
+          WHERE uc.consumer_id = p.person_id)                                                          AS total_bills,
+        (SELECT COALESCE(SUM(bd.total_amount),0) FROM utility_connection uc
+          JOIN bill_document bd ON bd.connection_id = uc.connection_id
+          WHERE uc.consumer_id = p.person_id AND bd.bill_status = 'PAID')                              AS total_paid,
+        (SELECT COALESCE(SUM(bd.total_amount),0) FROM utility_connection uc
+          JOIN bill_document bd ON bd.connection_id = uc.connection_id
+          WHERE uc.consumer_id = p.person_id AND bd.bill_status = 'UNPAID')                            AS total_outstanding,
+        (SELECT COUNT(*) FROM complaint WHERE consumer_id = p.person_id)                               AS total_complaints,
+        (SELECT COUNT(*) FROM connection_application WHERE consumer_id = p.person_id)                  AS total_applications
+      FROM person p
+      JOIN account  a    ON a.person_id    = p.person_id
+      JOIN consumer c    ON c.person_id    = p.person_id
+      JOIN address  addr ON p.address_id   = addr.address_id
+      JOIN region   r    ON addr.region_id = r.region_id
+      WHERE p.person_id = $1
+    `, [req.user.userId]);
+
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Profile not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// ── PUT /api/consumer/profile ─────────────────────────────────────────────────
+router.put('/profile', async (req, res) => {
+  const { first_name, last_name, phone_number, gender } = req.body;
+  if (!first_name || !last_name || !phone_number)
+    return res.status(400).json({ error: 'first_name, last_name and phone_number are required' });
+
+  try {
+    await pool.query(`
+      UPDATE person SET first_name=$1, last_name=$2, phone_number=$3, gender=$4
+      WHERE person_id=$5
+    `, [first_name, last_name, phone_number, gender || null, req.user.userId]);
+
+    res.json({ message: 'Profile updated' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+// ── PUT /api/consumer/avatar ──────────────────────────────────────────────────
+router.put('/avatar', async (req, res) => {
+  const { avatar_b64 } = req.body;
+  if (!avatar_b64) return res.status(400).json({ error: 'avatar_b64 is required' });
+  // Limit to ~2MB base64
+  if (avatar_b64.length > 2_800_000)
+    return res.status(400).json({ error: 'Image too large. Max 2MB.' });
+
+  try {
+    await pool.query(
+      `UPDATE account SET avatar_b64 = $1 WHERE person_id = $2`,
+      [avatar_b64, req.user.userId]
+    );
+    res.json({ message: 'Avatar updated', avatar_b64 });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update avatar' });
+  }
+});
+
+// ── PUT /api/consumer/password ────────────────────────────────────────────────
+router.put('/password', async (req, res) => {
+  const { current_password, new_password } = req.body;
+  if (!current_password || !new_password)
+    return res.status(400).json({ error: 'current_password and new_password are required' });
+  if (new_password.length < 8)
+    return res.status(400).json({ error: 'New password must be at least 8 characters' });
+
+  const bcrypt = require('bcrypt');
+  try {
+    const result = await pool.query(
+      `SELECT password_hashed FROM account WHERE person_id = $1`,
+      [req.user.userId]
+    );
+    const valid = await bcrypt.compare(current_password, result.rows[0].password_hashed);
+    if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
+
+    const hashed = await bcrypt.hash(new_password, 10);
+    await pool.query(
+      `UPDATE account SET password_hashed = $1 WHERE person_id = $2`,
+      [hashed, req.user.userId]
+    );
+    res.json({ message: 'Password changed successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
+// ── PUT /api/consumer/deactivate ──────────────────────────────────────────────
+router.put('/deactivate', async (req, res) => {
+  const { password } = req.body;
+  if (!password) return res.status(400).json({ error: 'Password confirmation required' });
+
+  const bcrypt = require('bcrypt');
+  try {
+    const result = await pool.query(
+      `SELECT password_hashed FROM account WHERE person_id = $1`,
+      [req.user.userId]
+    );
+    const valid = await bcrypt.compare(password, result.rows[0].password_hashed);
+    if (!valid) return res.status(401).json({ error: 'Incorrect password' });
+
+    await pool.query(
+      `UPDATE account SET is_active = FALSE WHERE person_id = $1`,
+      [req.user.userId]
+    );
+    res.json({ message: 'Account deactivated' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to deactivate account' });
+  }
+});

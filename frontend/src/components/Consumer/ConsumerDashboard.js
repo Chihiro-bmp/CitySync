@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../Layout/ThemeContext';
@@ -94,6 +94,7 @@ const ConsumerDashboard = () => {
 
   const [connections, setConnections] = useState([]);
   const [bills, setBills]             = useState([]);
+  const [complaints, setComplaints]   = useState([]);
   const [loading, setLoading]         = useState(true);
 
   useEffect(() => {
@@ -102,16 +103,19 @@ const ConsumerDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [connRes, billRes] = await Promise.all([
+      const [connRes, billRes, compRes] = await Promise.all([
         authFetch(`/api/consumer/connections`),
         authFetch(`/api/consumer/bills?limit=5`),
+        authFetch(`/api/consumer/complaints`),
       ]);
       const connData = await connRes.json();
       const billData = await billRes.json();
+      const compData = await compRes.json();
       if (!connRes.ok) throw new Error(connData.error);
       if (!billRes.ok) throw new Error(billData.error);
       setConnections(connData);
       setBills(billData);
+      setComplaints(Array.isArray(compData) ? compData : []);
     } catch (err) {
       console.error('Dashboard fetch error:', err);
     } finally {
@@ -123,6 +127,7 @@ const ConsumerDashboard = () => {
   const totalDue      = bills.filter(b => b.status !== 'Paid').reduce((s, b) => s + parseFloat(b.amount || 0), 0);
   const overdueBills  = bills.filter(b => b.status === 'Overdue');
   const activeConn    = connections.filter(c => c.connection_status === 'Connected');
+  const openComplaints = complaints.filter(c => c.status !== 'Resolved').length;
 
   // ── Skeleton loading ───────────────────────────────────────────────────────
   if (loading) return (
@@ -209,8 +214,8 @@ const ConsumerDashboard = () => {
         />
         <StatCard
           label="Complaints"
-          value="0 open"
-          sub="No active complaints"
+          value={`${openComplaints} open`}
+          sub={openComplaints === 0 ? 'No active complaints' : `${complaints.length} total`}
           gradient={utilities.complaint.gradient}
           glow={utilities.complaint.glow}
           Icon={ComplaintIcon}

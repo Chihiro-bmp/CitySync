@@ -9,6 +9,8 @@ export const ThemeProvider = ({ children }) => {
 
   useEffect(() => {
     localStorage.setItem('citysync_theme', mode);
+    // Set data-theme on body so CSS can style native elements (selects, scrollbars)
+    document.body.setAttribute('data-theme', mode);
   }, [mode]);
 
   const toggle = () => setMode(m => m === 'light' ? 'dark' : 'light');

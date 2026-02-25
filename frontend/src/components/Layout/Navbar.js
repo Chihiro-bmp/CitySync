@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useAvatar } from '../../context/AvatarContext';
 import { useTheme } from './ThemeContext';
 import { tokens, fonts } from '../../theme';
 import { SunIcon, MoonIcon, ChevronIcon } from '../../Icons';
@@ -16,6 +17,7 @@ const getPageTitle = (pathname) => {
 
 const Navbar = ({ sidebarWidth }) => {
   const { user } = useAuth();
+  const { avatar } = useAvatar();
   const { isDark, toggle } = useTheme();
   const location = useLocation();
   const t = tokens[isDark ? 'dark' : 'light'];
@@ -108,18 +110,18 @@ const Navbar = ({ sidebarWidth }) => {
             background: isDark ? '#0F1628' : '#fff',
             cursor: 'default',
           }}>
-            {/* Avatar circle */}
+            {/* Avatar circle — shows photo if uploaded, otherwise initials */}
             <div style={{
               width: 28, height: 28, borderRadius: '50%',
               background: 'linear-gradient(135deg,#3B6FFF,#00C4FF)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: fonts.ui,
-              fontSize: 12,
-              fontWeight: 700,
-              color: '#fff',
-              flexShrink: 0,
+              fontFamily: fonts.ui, fontSize: 12, fontWeight: 700, color: '#fff',
+              flexShrink: 0, overflow: 'hidden',
             }}>
-              {user.firstName?.[0]?.toUpperCase()}{user.lastName?.[0]?.toUpperCase()}
+              {avatar
+                ? <img src={avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <>{user.firstName?.[0]?.toUpperCase()}{user.lastName?.[0]?.toUpperCase()}</>
+              }
             </div>
             <div>
               <div style={{ fontFamily: fonts.ui, fontSize: 13, fontWeight: 600, color: t.text, lineHeight: 1.2 }}>

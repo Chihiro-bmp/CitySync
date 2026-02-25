@@ -78,12 +78,14 @@ export const shadows = {
 
 export const navItems = {
   consumer: [
-    { label:'Dashboard',  path:'/consumer/dashboard',  icon:'home'      },
-    { label:'My Bills',   path:'/consumer/bills',      icon:'bill'      },
-    { label:'Payments',   path:'/consumer/payments',   icon:'payment'   },
-    { label:'Usage',      path:'/consumer/usage',      icon:'usage'     },
-    { label:'Complaints', path:'/consumer/complaints', icon:'complaint' },
-    { label:'Profile',    path:'/consumer/profile',    icon:'profile'   },
+    { label:'Dashboard',    path:'/consumer/dashboard',     icon:'home'       },
+    { label:'Connections',  path:'/consumer/connections',   icon:'connection' },
+    { label:'My Bills',     path:'/consumer/bills',         icon:'bill'       },
+    { label:'Payments',     path:'/consumer/payments',      icon:'payment'    },
+    { label:'Usage',        path:'/consumer/usage',         icon:'usage'      },
+    { label:'Applications', path:'/consumer/applications',  icon:'connection' },
+    { label:'Complaints',   path:'/consumer/complaints',    icon:'complaint'  },
+    { label:'Profile',      path:'/consumer/profile',       icon:'profile'    },
   ],
   field_worker: [
     { label:'Dashboard',   path:'/field-worker/dashboard', icon:'home'    },
