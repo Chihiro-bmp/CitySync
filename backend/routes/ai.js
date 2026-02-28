@@ -55,9 +55,9 @@ async function getConsumerContext(userId) {
   ]);
 
   return {
-    usage:      usageRes.rows,
-    bills:      billRes.rows,
-    complaints: complaintRes.rows,
+    usage:       usageRes.rows,
+    bills:       billRes.rows,
+    complaints:  complaintRes.rows,
     connections: connRes.rows,
   };
 }
@@ -154,12 +154,7 @@ Recent Usage (last 36 records): ${JSON.stringify(ctx.usage)}
 Recent Bills (last 24): ${JSON.stringify(ctx.bills)}
 Complaints summary: ${JSON.stringify(ctx.complaints)}`;
 
-    const messages = [
-      ...history.map(h => ({ role: h.role, content: h.content })),
-      { role: 'user', content: question },
-    ];
-
-    const response = await callClaude(systemPrompt, messages);
+    const response = await callGemini(systemPrompt, history, question);
     res.json({ answer: response });
   } catch (err) {
     console.error('AI consumer error:', err);
@@ -185,12 +180,7 @@ Complaints by region: ${JSON.stringify(ctx.complaints)}
 Field worker performance: ${JSON.stringify(ctx.workers)}
 Connection stats: ${JSON.stringify(ctx.connections)}`;
 
-    const messages = [
-      ...history.map(h => ({ role: h.role, content: h.content })),
-      { role: 'user', content: question },
-    ];
-
-    const response = await callClaude(systemPrompt, messages);
+    const response = await callGemini(systemPrompt, history, question);
     res.json({ answer: response });
   } catch (err) {
     console.error('AI employee error:', err);
@@ -198,19 +188,26 @@ Connection stats: ${JSON.stringify(ctx.connections)}`;
   }
 });
 
-// ── Anthropic API call ─────────────────────────────────────────────────────
-async function callClaude(systemPrompt, messages) {
-  const Anthropic = require('@anthropic-ai/sdk');
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// ── Gemini API call ────────────────────────────────────────────────────────
+// Uses @google/generative-ai — install with: npm install @google/generative-ai
+async function callGemini(systemPrompt, history, question) {
+  const { GoogleGenerativeAI } = require('@google/generative-ai');
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-  const response = await client.messages.create({
-    model:      'claude-sonnet-4-20250514',
-    max_tokens: 1024,
-    system:     systemPrompt,
-    messages,
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    systemInstruction: systemPrompt,
   });
 
-  return response.content[0].text;
+  // Convert history to Gemini format: { role: 'user'|'model', parts: [{ text }] }
+  const geminiHistory = history.map(h => ({
+    role:  h.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: h.content }],
+  }));
+
+  const chat = model.startChat({ history: geminiHistory });
+  const result = await chat.sendMessage(question);
+  return result.response.text();
 }
 
 module.exports = router;

@@ -6,20 +6,49 @@ import { ElectricityIcon, WaterIcon, GasIcon } from '../../Icons';
 import { BarChart, LineChart } from '../Charts';
 
 const UtilIcons = { electricity: ElectricityIcon, water: WaterIcon, gas: GasIcon };
-const TABS      = ['electricity', 'water', 'gas'];
 const PERIODS   = ['3 months', '6 months', '12 months'];
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-const monthKey  = (d) => new Date(d).toLocaleDateString('en-GB', { month:'short', year:'2-digit' });
-const shortMon  = (d) => new Date(d).toLocaleDateString('en-GB', { month:'short' });
+const sortKey  = (d) => { const dt = new Date(d); return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`; };
+const monthKey = (d) => new Date(d).toLocaleDateString('en-GB', { month:'short', year:'2-digit' });
+const dayKey   = (d) => { const dt = new Date(d); return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`; };
+const dayLabel = (d) => new Date(d).toLocaleDateString('en-GB', { day:'numeric', month:'short' });
 
+// Group readings into sorted monthly buckets
 const groupByMonth = (readings) => {
   const map = {};
   readings.forEach(u => {
-    const key = monthKey(u.time_to);
-    map[key]  = (map[key] || 0) + parseFloat(u.units_logged || 0);
+    const sk  = sortKey(u.time_to);
+    const lbl = monthKey(u.time_to);
+    if (!map[sk]) map[sk] = { label: lbl, value: 0, sk };
+    map[sk].value += parseFloat(u.units_logged || 0);
   });
-  return map;
+  return Object.values(map).sort((a, b) => a.sk.localeCompare(b.sk));
+};
+
+// Group readings into daily buckets for a specific YYYY-MM
+const groupByDay = (readings, monthSk) => {
+  const inMonth = readings.filter(u => sortKey(u.time_to) === monthSk);
+  if (inMonth.length === 0) return [];
+
+  // If we only have 1 reading for the whole month, distribute evenly across days
+  const map = {};
+  inMonth.forEach(u => {
+    const from  = new Date(u.time_from);
+    const to    = new Date(u.time_to);
+    const days  = Math.max(1, Math.round((to - from) / 86400000));
+    const daily = parseFloat(u.units_logged || 0) / days;
+    for (let i = 0; i < days; i++) {
+      const d  = new Date(from);
+      d.setDate(d.getDate() + i);
+      const sk = dayKey(d);
+      if (!map[sk]) map[sk] = { label: dayLabel(d), value: 0, sk };
+      map[sk].value += daily;
+    }
+  });
+  return Object.values(map)
+    .sort((a, b) => a.sk.localeCompare(b.sk))
+    .map(d => ({ ...d, value: parseFloat(d.value.toFixed(2)) }));
 };
 
 const StatPill = ({ label, value, sub, t }) => (
@@ -36,10 +65,12 @@ const UsageHistory = () => {
   const { isDark }    = useTheme();
   const t = tokens[isDark ? 'dark' : 'light'];
 
-  const [activeTab, setActiveTab] = useState('electricity');
-  const [period, setPeriod]       = useState('6 months');
-  const [usage, setUsage]         = useState([]);
-  const [loading, setLoading]     = useState(true);
+  const [activeTab,  setActiveTab]  = useState('electricity');
+  const [period,     setPeriod]     = useState('6 months');
+  const [usage,      setUsage]      = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [barOffset,  setBarOffset]  = useState(0);   // for bar chart pagination
+  const [drillMonth, setDrillMonth] = useState(null); // { sk, label } for daily drill-down
 
   const fetchUsage = useCallback(async () => {
     setLoading(true);
@@ -48,49 +79,79 @@ const UsageHistory = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setUsage(data);
+      if (Array.isArray(data) && data.length > 0) setActiveTab(data[0].utility_tag);
     } catch (err) { console.error(err); }
     finally      { setLoading(false); }
   }, [authFetch]);
 
   useEffect(() => { fetchUsage(); }, [fetchUsage]);
 
-  // Derived data
+  // Reset drill + offset when tab/period changes
+  useEffect(() => { setDrillMonth(null); setBarOffset(0); }, [activeTab, period]);
+
+  // ── Derived data ────────────────────────────────────────────────────────────
   const monthCount = period === '3 months' ? 3 : period === '6 months' ? 6 : 12;
+  const filtered   = usage.filter(u => u.utility_tag === activeTab);
+  const monthArr   = groupByMonth(filtered);
 
-  const filtered = usage.filter(u => u.utility_tag === activeTab);
+  // Bar chart pagination: slice a window of monthCount from the full array
+  const maxOffset    = Math.max(0, monthArr.length - monthCount);
+  const windowStart  = Math.max(0, monthArr.length - monthCount - barOffset);
+  const windowEnd    = Math.max(monthCount, monthArr.length - barOffset);
+  const visibleMonths = monthArr.slice(windowStart, windowEnd);
+  const chartData    = visibleMonths.map(m => ({ label: m.label, value: Math.round(m.value) }));
 
-  const monthMap   = groupByMonth(filtered);
-  const allMonths  = Object.keys(monthMap).slice(-monthCount);
-  const chartData  = allMonths.map(label => ({ label, value: Math.round(monthMap[label]) }));
+  // Line chart always uses the LAST N months for comparison
+  const allMonths  = monthArr.slice(-monthCount);
+  const prevMonths = monthArr.slice(-(monthCount * 2), -monthCount);
 
-  // Comparison lines: this period vs previous period
-  const prevMonths = Object.keys(monthMap).slice(-(monthCount * 2), -monthCount);
-  const lineData   = [
+  // Daily drill-down data
+  const drillData = drillMonth ? groupByDay(filtered, drillMonth.sk) : [];
+
+  // Fuzzy-match utility tag to theme key
+  const resolveUtil = (tag) => {
+    if (!tag) return utilities.electricity;
+    if (utilities[tag]) return utilities[tag];
+    const k = Object.keys(utilities).find(k => tag.includes(k) || k.includes(tag));
+    return utilities[k] || utilities.electricity;
+  };
+  const util = resolveUtil(activeTab);
+  const Icon = UtilIcons[activeTab] || UtilIcons.electricity;
+
+  const lineData = [
     {
       label: `Current (${period})`,
-      color: utilities[activeTab]?.gradient.match(/#[A-Fa-f0-9]{6}/)?.[0] || '#3B6FFF',
-      points: allMonths.map(m => ({ label: m, value: Math.round(monthMap[m] || 0) })),
+      color: util.gradient.match(/#[A-Fa-f0-9]{6}/)?.[0] || '#3B6FFF',
+      points: allMonths.map(m => ({ label: m.label, value: Math.round(m.value) })),
     },
     {
       label: `Previous (${period})`,
       color: isDark ? '#2A3550' : '#C4CADB',
       points: prevMonths.length
-        ? prevMonths.map((m, i) => ({ label: allMonths[i] || m, value: Math.round(monthMap[m] || 0) }))
-        : allMonths.map(m => ({ label: m, value: 0 })),
+        ? prevMonths.map((m, i) => ({ label: allMonths[i]?.label || m.label, value: Math.round(m.value) }))
+        : allMonths.map(m => ({ label: m.label, value: 0 })),
     },
   ];
 
-  const totalUnits   = filtered.reduce((s, u) => s + parseFloat(u.units_logged || 0), 0);
-  const avgUnits     = filtered.length ? (totalUnits / filtered.length).toFixed(1) : 0;
-  const lastReading  = filtered[0];
-  const util         = utilities[activeTab];
-  const Icon         = UtilIcons[activeTab];
+  const totalUnits  = filtered.reduce((s, u) => s + parseFloat(u.units_logged || 0), 0);
+  const avgUnits    = filtered.length ? (totalUnits / filtered.length).toFixed(1) : 0;
+  const lastReading = filtered[0];
+  const unitLabel   = lastReading?.unit_of_measurement || 'units';
 
-  // Trend: compare last 2 months
-  const lastTwo = Object.values(monthMap).slice(-2);
+  const lastTwo = allMonths.slice(-2);
   const trend   = lastTwo.length === 2
-    ? ((lastTwo[1] - lastTwo[0]) / (lastTwo[0] || 1) * 100).toFixed(1)
+    ? ((lastTwo[1].value - lastTwo[0].value) / (lastTwo[0].value || 1) * 100).toFixed(1)
     : null;
+
+  // Shared nav button style
+  const navBtn = (disabled) => ({
+    padding:'5px 12px', borderRadius:8, border:`1px solid ${t.border}`,
+    background: disabled ? 'transparent' : (isDark ? t.bgHover : '#F0F4FF'),
+    color: disabled ? t.textMuted : t.text,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    fontSize:14, lineHeight:1, transition:'all 0.15s',
+    opacity: disabled ? 0.4 : 1,
+  });
 
   return (
     <div style={{ fontFamily:fonts.ui }}>
@@ -102,12 +163,12 @@ const UsageHistory = () => {
         <p style={{ fontSize:14, color:t.textSub }}>Monitor and compare your utility consumption over time</p>
       </div>
 
-      {/* Utility tabs + period picker */}
+      {/* Tabs + period picker */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:12, marginBottom:22 }}>
         <div style={{ display:'flex', gap:10 }}>
-          {TABS.map(tab => {
-            const u  = utilities[tab];
-            const Ic = UtilIcons[tab];
+          {[...new Set(usage.map(u => u.utility_tag))].map(tab => {
+            const u   = resolveUtil(tab);
+            const Ic  = UtilIcons[tab] || UtilIcons.electricity;
             const active = tab === activeTab;
             return (
               <button key={tab} onClick={() => setActiveTab(tab)} style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 18px', borderRadius:12, border:`1.5px solid ${active ? 'transparent' : t.border}`, background: active ? u.gradient : (isDark ? t.bgCard : '#fff'), cursor:'pointer', transition:'all 0.2s', boxShadow: active ? `0 4px 14px ${u.glow}` : 'none' }}>
@@ -117,8 +178,6 @@ const UsageHistory = () => {
             );
           })}
         </div>
-
-        {/* Period selector */}
         <div style={{ display:'flex', gap:6 }}>
           {PERIODS.map(p => (
             <button key={p} onClick={() => setPeriod(p)} style={{ padding:'6px 14px', borderRadius:100, border:`1.5px solid ${period === p ? t.primary : t.border}`, background: period === p ? (isDark ? 'rgba(59,111,255,0.15)' : '#EEF2FF') : 'transparent', color: period === p ? t.primary : t.textSub, fontSize:12, fontWeight:500, fontFamily:fonts.ui, cursor:'pointer', transition:'all 0.15s' }}>
@@ -137,13 +196,13 @@ const UsageHistory = () => {
         <>
           {/* Stat pills */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(155px,1fr))', gap:12, marginBottom:20 }}>
-            <StatPill label="Total Usage"  value={`${Math.round(totalUnits)}`}      sub={lastReading?.unit_of_measurement || 'units'}           t={t} />
-            <StatPill label="Avg / Read"   value={`${avgUnits}`}                     sub="Units per reading"                                      t={t} />
-            <StatPill label="Readings"     value={filtered.length}                   sub="Total meter reads"                                      t={t} />
+            <StatPill label="Total Usage"   value={`${Math.round(totalUnits)}`}  sub={unitLabel}            t={t} />
+            <StatPill label="Avg / Read"    value={`${avgUnits}`}                sub="Units per reading"    t={t} />
+            <StatPill label="Readings"      value={filtered.length}              sub="Total meter reads"    t={t} />
             <StatPill label="Monthly Trend" value={trend !== null ? `${trend > 0 ? '↑' : '↓'} ${Math.abs(trend)}%` : '—'} sub="vs previous month" t={t} />
           </div>
 
-          {/* Comparison line chart */}
+          {/* Period comparison line chart */}
           <div style={{ background:t.bgCard, border:`1px solid ${t.border}`, borderRadius:16, padding:24, marginBottom:16 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20, flexWrap:'wrap', gap:10 }}>
               <div>
@@ -156,22 +215,64 @@ const UsageHistory = () => {
                 </div>
               )}
             </div>
-            <LineChart lines={lineData} t={t} isDark={isDark} unit={lastReading?.unit_of_measurement || 'units'} height={220} />
+            <LineChart lines={lineData} t={t} isDark={isDark} unit={unitLabel} height={220} />
           </div>
 
-          {/* Monthly bar chart */}
+          {/* Monthly breakdown bar chart */}
           <div style={{ background:t.bgCard, border:`1px solid ${t.border}`, borderRadius:16, padding:24, marginBottom:16 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, flexWrap:'wrap', gap:10 }}>
               <div>
                 <div style={{ fontSize:15, fontWeight:600, color:t.text }}>Monthly Breakdown</div>
-                <div style={{ fontSize:12, color:t.textSub, marginTop:2 }}>Hover any bar for exact amount</div>
+                <div style={{ fontSize:12, color:t.textSub, marginTop:2 }}>
+                  {drillMonth
+                    ? <>Showing daily distribution for <strong style={{ color:t.text }}>{drillMonth.label}</strong></>
+                    : 'Click any bar to drill into daily usage'}
+                </div>
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 13px', borderRadius:100, background: isDark ? '#0A1020' : '#F8FAFF', border:`1px solid ${t.border}` }}>
-                <div style={{ width:10, height:10, borderRadius:3, background:util.gradient }} />
-                <span style={{ fontSize:12, color:t.textSub, fontFamily:fonts.mono, textTransform:'capitalize' }}>{activeTab}</span>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                {/* Drill-down back button */}
+                {drillMonth && (
+                  <button onClick={() => setDrillMonth(null)} style={{ padding:'5px 12px', borderRadius:8, border:`1px solid ${t.border}`, background: isDark ? t.bgHover : '#F0F4FF', color:t.primary, cursor:'pointer', fontSize:12, fontWeight:500 }}>
+                    ← Back to months
+                  </button>
+                )}
+                {/* Prev / Next navigation (only in month view) */}
+                {!drillMonth && (
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <button disabled={barOffset >= maxOffset} onClick={() => setBarOffset(o => Math.min(o + monthCount, maxOffset))} style={navBtn(barOffset >= maxOffset)}>←</button>
+                    <span style={{ fontSize:11, color:t.textMuted, fontFamily:fonts.mono, minWidth:80, textAlign:'center' }}>
+                      {visibleMonths[0]?.label} – {visibleMonths[visibleMonths.length-1]?.label}
+                    </span>
+                    <button disabled={barOffset <= 0} onClick={() => setBarOffset(o => Math.max(0, o - monthCount))} style={navBtn(barOffset <= 0)}>→</button>
+                  </div>
+                )}
+                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 13px', borderRadius:100, background: isDark ? '#0A1020' : '#F8FAFF', border:`1px solid ${t.border}` }}>
+                  <div style={{ width:10, height:10, borderRadius:3, background:util.gradient }} />
+                  <span style={{ fontSize:12, color:t.textSub, fontFamily:fonts.mono, textTransform:'capitalize' }}>{activeTab}</span>
+                </div>
               </div>
             </div>
-            <BarChart data={chartData} gradient={util.gradient} glow={util.glow} unit={lastReading?.unit_of_measurement || 'units'} t={t} isDark={isDark} />
+
+            {drillMonth ? (
+              drillData.length === 0
+                ? <div style={{ textAlign:'center', padding:'48px 0', color:t.textMuted, fontSize:13 }}>No data for {drillMonth.label}</div>
+                : <BarChart
+                    data={drillData.map(d => ({ label: d.label, value: d.value }))}
+                    gradient={util.gradient} glow={util.glow}
+                    unit={unitLabel} t={t} isDark={isDark}
+                  />
+            ) : (
+              <BarChart
+                data={chartData}
+                gradient={util.gradient} glow={util.glow}
+                unit={unitLabel} t={t} isDark={isDark}
+                activeBar={null}
+                onBarClick={(d) => {
+                  const m = visibleMonths.find(m => m.label === d.label);
+                  if (m) setDrillMonth({ sk: m.sk, label: m.label });
+                }}
+              />
+            )}
           </div>
 
           {/* Reading log table */}

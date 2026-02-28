@@ -18,6 +18,7 @@ import UsageHistory      from './components/Consumer/UsageHistory';
 import Complaints              from './components/Consumer/Complaints';
 import ConnectionApplications  from './components/Consumer/ConnectionApplications';
 import MyConnections           from './components/Consumer/Myconnections';
+import Payments                from './components/Consumer/Payments';
 import Profile                 from './components/Consumer/Profile';
 
 // Employee pages
@@ -60,9 +61,10 @@ function App() {
                     <Route path="usage"      element={<UsageHistory />} />
                     <Route path="complaints"   element={<Complaints />} />
                     <Route path="applications" element={<ConnectionApplications />} />
+                    <Route path="payments"     element={<Payments />} />
                     <Route path="profile"      element={<Profile />} />
                     {/* TODO: payments */}
-                    <Route path="*" element={<Navigate to="dashboard" replace />} />
+                    <Route path="*" element={<Navigate to="/consumer/dashboard" replace />} />
                   </Routes>
                 </Layout>
               </ProtectedRoute>
@@ -75,7 +77,7 @@ function App() {
                   <Routes>
                     <Route path="dashboard" element={<ConsumerDashboard />} />
                     {/* TODO: jobs, readings */}
-                    <Route path="*" element={<Navigate to="dashboard" replace />} />
+                    <Route path="*" element={<Navigate to="/field-worker/dashboard" replace />} />
                   </Routes>
                 </Layout>
               </ProtectedRoute>
@@ -91,7 +93,7 @@ function App() {
                     <Route path="regions/new"      element={<RegionForm />} />
                     <Route path="regions/edit/:id" element={<RegionEdit />} />
                     {/* TODO: connections, consumers, tariffs, complaints, field-workers, analytics */}
-                    <Route path="*" element={<Navigate to="dashboard" replace />} />
+                    <Route path="*" element={<Navigate to="/employee/dashboard" replace />} />
                   </Routes>
                 </Layout>
               </ProtectedRoute>

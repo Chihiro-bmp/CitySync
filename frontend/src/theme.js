@@ -70,6 +70,112 @@ export const statusColors = {
 
 export const radii = { sm:8, md:10, lg:12, xl:16, '2xl':20, full:9999 };
 
+// ─── Time-based ambient gradients ─────────────────────────────────────────────
+// Returns a palette based on current hour — used in Layout as page background
+export const getTimePalette = () => {
+  const h = new Date().getHours();
+
+  const palettes = {
+    // 00–04 Midnight — deep cool indigo
+    midnight: {
+      label: 'Midnight',
+      light: {
+        bg:   'linear-gradient(160deg, #E8EAFF 0%, #EEF0FB 30%, #F5F6FA 65%)',
+        orb1: 'radial-gradient(ellipse at 20% 0%,  rgba(99,102,241,0.10) 0%, transparent 60%)',
+        orb2: 'radial-gradient(ellipse at 80% 10%, rgba(139,92,246,0.07) 0%, transparent 55%)',
+      },
+      // Single centered top halo — indigo tint, barely visible
+      dark: {
+        bg:   '#080C18',
+        orb1: 'radial-gradient(ellipse 80% 35% at 50% -5%, rgba(110,115,255,0.09) 0%, transparent 100%)',
+        orb2: 'none',
+      },
+    },
+    // 05–07 Dawn — warm peach / rose sunrise
+    dawn: {
+      label: 'Dawn',
+      light: {
+        bg:   'linear-gradient(160deg, #FFF0E8 0%, #FDEEF4 30%, #F5F6FA 65%)',
+        orb1: 'radial-gradient(ellipse at 15% 0%,  rgba(251,146,60,0.13)  0%, transparent 55%)',
+        orb2: 'radial-gradient(ellipse at 75% 5%,  rgba(244,114,182,0.09) 0%, transparent 50%)',
+      },
+      // Warm amber halo bleeding in from top — like first light
+      dark: {
+        bg:   '#080C18',
+        orb1: 'radial-gradient(ellipse 70% 30% at 50% -5%, rgba(255,160,80,0.08) 0%, transparent 100%)',
+        orb2: 'none',
+      },
+    },
+    // 08–11 Morning — fresh sky blue
+    morning: {
+      label: 'Morning',
+      light: {
+        bg:   'linear-gradient(160deg, #E0EEFF 0%, #EBF4FF 30%, #F5F6FA 65%)',
+        orb1: 'radial-gradient(ellipse at 25% 0%,  rgba(59,111,255,0.10) 0%, transparent 55%)',
+        orb2: 'radial-gradient(ellipse at 70% 8%,  rgba(0,196,255,0.08)  0%, transparent 50%)',
+      },
+      // Cool blue halo — crisp daylight
+      dark: {
+        bg:   '#080C18',
+        orb1: 'radial-gradient(ellipse 75% 32% at 50% -5%, rgba(80,140,255,0.09) 0%, transparent 100%)',
+        orb2: 'none',
+      },
+    },
+    // 12–16 Afternoon — bright golden white
+    afternoon: {
+      label: 'Afternoon',
+      light: {
+        bg:   'linear-gradient(160deg, #FFFBEA 0%, #FFF8E1 25%, #F5F6FA 65%)',
+        orb1: 'radial-gradient(ellipse at 30% 0%,  rgba(245,166,35,0.11) 0%, transparent 55%)',
+        orb2: 'radial-gradient(ellipse at 75% 5%,  rgba(251,191,36,0.08) 0%, transparent 50%)',
+      },
+      // Neutral-warm halo — bright overhead sun, almost white
+      dark: {
+        bg:   '#080C18',
+        orb1: 'radial-gradient(ellipse 80% 30% at 50% -5%, rgba(200,185,140,0.07) 0%, transparent 100%)',
+        orb2: 'none',
+      },
+    },
+    // 17–19 Evening — warm amber / purple dusk
+    evening: {
+      label: 'Evening',
+      light: {
+        bg:   'linear-gradient(160deg, #FFF0E6 0%, #F9EDF8 30%, #F5F6FA 65%)',
+        orb1: 'radial-gradient(ellipse at 20% 0%,  rgba(239,68,68,0.08)  0%, transparent 55%)',
+        orb2: 'radial-gradient(ellipse at 80% 5%,  rgba(168,85,247,0.09) 0%, transparent 50%)',
+      },
+      // Purple-rose halo — golden hour fading to dusk
+      dark: {
+        bg:   '#080C18',
+        orb1: 'radial-gradient(ellipse 75% 32% at 50% -5%, rgba(180,90,200,0.08) 0%, transparent 100%)',
+        orb2: 'none',
+      },
+    },
+    // 20–23 Night — deep violet
+    night: {
+      label: 'Night',
+      light: {
+        bg:   'linear-gradient(160deg, #EDE8FF 0%, #F1EDFB 30%, #F5F6FA 65%)',
+        orb1: 'radial-gradient(ellipse at 25% 0%,  rgba(139,92,246,0.10) 0%, transparent 55%)',
+        orb2: 'radial-gradient(ellipse at 70% 8%,  rgba(99,102,241,0.07) 0%, transparent 50%)',
+      },
+      // Soft violet halo — city glow at night
+      dark: {
+        bg:   '#080C18',
+        orb1: 'radial-gradient(ellipse 78% 30% at 50% -5%, rgba(130,100,255,0.08) 0%, transparent 100%)',
+        orb2: 'none',
+      },
+    },
+  };
+
+  if      (h >= 0  && h < 5)  return palettes.midnight;
+  else if (h >= 5  && h < 8)  return palettes.dawn;
+  else if (h >= 8  && h < 12) return palettes.morning;
+  else if (h >= 12 && h < 17) return palettes.afternoon;
+  else if (h >= 17 && h < 20) return palettes.evening;
+  else                         return palettes.night;
+};
+
 export const shadows = {
   card:    '0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04)',
   cardDark:'0 1px 3px rgba(0,0,0,0.3),  0 4px 16px rgba(0,0,0,0.2)',
@@ -83,7 +189,7 @@ export const navItems = {
     { label:'My Bills',     path:'/consumer/bills',         icon:'bill'       },
     { label:'Payments',     path:'/consumer/payments',      icon:'payment'    },
     { label:'Usage',        path:'/consumer/usage',         icon:'usage'      },
-    { label:'Applications', path:'/consumer/applications',  icon:'connection' },
+    { label:'Applications', path:'/consumer/applications',  icon:'application' },
     { label:'Complaints',   path:'/consumer/complaints',    icon:'complaint'  },
     { label:'Profile',      path:'/consumer/profile',       icon:'profile'    },
   ],

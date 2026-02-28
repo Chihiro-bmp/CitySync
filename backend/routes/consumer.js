@@ -224,62 +224,196 @@ router.post('/complaints', async (req, res) => {
   }
 });
 
-// ── POST /api/consumer/payments ───────────────────────────────────────────────
-// payment_after_insert trigger handles setting bill_status = 'PAID' automatically
-router.post('/payments', async (req, res) => {
-  const { bill_document_id, payment_amount, payment_method, provider_name, phone_num, account_num } = req.body;
+// ── GET /api/consumer/payment-methods ────────────────────────────────────────
+router.get('/payment-methods', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        pm.method_id, pm.method_name, pm.is_default,
+        b.bank_name,   b.account_num,
+        mb.provider_name, mb.phone_num AS mb_phone,
+        gp.google_account_email, gp.phone_num AS gp_phone
+      FROM payment_method pm
+      LEFT JOIN bank          b  ON pm.method_id = b.method_id
+      LEFT JOIN mobile_banking mb ON pm.method_id = mb.method_id
+      LEFT JOIN google_pay    gp ON pm.method_id = gp.method_id
+      WHERE pm.consumer_id = $1
+      ORDER BY pm.is_default DESC, pm.method_id ASC
+    `, [req.user.userId]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch payment methods' });
+  }
+});
 
-  if (!bill_document_id || !payment_amount || !payment_method)
-    return res.status(400).json({ error: 'bill_document_id, payment_amount, and payment_method are required' });
+// ── POST /api/consumer/payment-methods ───────────────────────────────────────
+router.post('/payment-methods', async (req, res) => {
+  const { method_name, bank_name, account_num, provider_name, phone_num, google_account_email, set_default } = req.body;
+  if (!method_name) return res.status(400).json({ error: 'method_name is required' });
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // Verify bill belongs to this consumer and isn't already paid
+    // If setting as default, unset existing default
+    if (set_default) {
+      await client.query(
+        `UPDATE payment_method SET is_default = FALSE WHERE consumer_id = $1`,
+        [req.user.userId]
+      );
+    }
+
+    const methodRes = await client.query(
+      `INSERT INTO payment_method (method_name, consumer_id, is_default) VALUES ($1, $2, $3) RETURNING method_id`,
+      [method_name, req.user.userId, set_default || false]
+    );
+    const methodId = methodRes.rows[0].method_id;
+
+    if (method_name === 'bank') {
+      if (!bank_name || !account_num) throw new Error('bank_name and account_num are required');
+      await client.query(
+        `INSERT INTO bank (method_id, bank_name, account_num) VALUES ($1, $2, $3)`,
+        [methodId, bank_name, account_num]
+      );
+    } else if (method_name === 'mobile_banking') {
+      if (!provider_name || !phone_num) throw new Error('provider_name and phone_num are required');
+      await client.query(
+        `INSERT INTO mobile_banking (method_id, provider_name, phone_num) VALUES ($1, $2, $3)`,
+        [methodId, provider_name, phone_num]
+      );
+    } else if (method_name === 'google_pay') {
+      if (!google_account_email) throw new Error('google_account_email is required');
+      await client.query(
+        `INSERT INTO google_pay (method_id, google_account_email, phone_num) VALUES ($1, $2, $3)`,
+        [methodId, google_account_email, phone_num || null]
+      );
+    } else {
+      throw new Error('Invalid method_name');
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ message: 'Payment method added', method_id: methodId });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    res.status(400).json({ error: err.message || 'Failed to add payment method' });
+  } finally {
+    client.release();
+  }
+});
+
+// ── PUT /api/consumer/payment-methods/:id/default ─────────────────────────────
+router.put('/payment-methods/:id/default', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `UPDATE payment_method SET is_default = FALSE WHERE consumer_id = $1`,
+      [req.user.userId]
+    );
+    await client.query(
+      `UPDATE payment_method SET is_default = TRUE WHERE method_id = $1 AND consumer_id = $2`,
+      [req.params.id, req.user.userId]
+    );
+    await client.query('COMMIT');
+    res.json({ message: 'Default updated' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: 'Failed to update default' });
+  } finally {
+    client.release();
+  }
+});
+
+// ── DELETE /api/consumer/payment-methods/:id ──────────────────────────────────
+router.delete('/payment-methods/:id', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `DELETE FROM payment_method WHERE method_id = $1 AND consumer_id = $2 RETURNING method_id`,
+      [req.params.id, req.user.userId]
+    );
+    if (result.rows.length === 0)
+      return res.status(404).json({ error: 'Payment method not found' });
+    res.json({ message: 'Deleted' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete' });
+  }
+});
+
+// ── GET /api/consumer/payment-history ────────────────────────────────────────
+router.get('/payment-history', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        p.payment_id, p.payment_amount, p.payment_date, p.status,
+        pm.method_name, pm.is_default,
+        b.bank_name,   b.account_num,
+        mb.provider_name, mb.phone_num AS mb_phone,
+        gp.google_account_email,
+        bd.total_amount, bd.bill_generation_date,
+        LOWER(u.utility_name) AS utility_name
+      FROM payment p
+      JOIN payment_method   pm ON p.method_id       = pm.method_id
+      JOIN bill_document    bd ON p.bill_document_id = bd.bill_document_id
+      JOIN utility_connection uc ON bd.connection_id = uc.connection_id
+      JOIN tariff           t  ON uc.tariff_id       = t.tariff_id
+      JOIN utility          u  ON t.utility_id       = u.utility_id
+      LEFT JOIN bank          b  ON pm.method_id = b.method_id
+      LEFT JOIN mobile_banking mb ON pm.method_id = mb.method_id
+      LEFT JOIN google_pay    gp ON pm.method_id = gp.method_id
+      WHERE uc.consumer_id = $1
+      ORDER BY p.payment_date DESC
+      LIMIT 50
+    `, [req.user.userId]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch payment history' });
+  }
+});
+
+// ── POST /api/consumer/payments ───────────────────────────────────────────────
+// Pays a bill using a saved or new payment method
+// payment_after_insert trigger sets bill_status = 'PAID' automatically
+router.post('/payments', async (req, res) => {
+  const { bill_document_id, payment_amount, method_id } = req.body;
+
+  if (!bill_document_id || !payment_amount || !method_id)
+    return res.status(400).json({ error: 'bill_document_id, payment_amount, and method_id are required' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Verify bill belongs to this consumer and is unpaid
     const billCheck = await client.query(`
-      SELECT bd.bill_document_id, bd.bill_status, uc.consumer_id
+      SELECT bd.bill_document_id, bd.bill_status
       FROM bill_document bd
       JOIN utility_connection uc ON bd.connection_id = uc.connection_id
       WHERE bd.bill_document_id = $1 AND uc.consumer_id = $2
     `, [bill_document_id, req.user.userId]);
 
-    if (billCheck.rows.length === 0)
-      return res.status(404).json({ error: 'Bill not found' });
-    if (billCheck.rows[0].bill_status === 'PAID')
-      return res.status(400).json({ error: 'Bill already paid' });
+    if (billCheck.rows.length === 0) return res.status(404).json({ error: 'Bill not found' });
+    if (billCheck.rows[0].bill_status === 'PAID') return res.status(400).json({ error: 'Bill already paid' });
 
-    // Payment method
-    const methodRes = await client.query(
-      `INSERT INTO payment_method (method_name) VALUES ($1) RETURNING method_id`,
-      [payment_method]
+    // Verify method belongs to this consumer
+    const methodCheck = await pool.query(
+      `SELECT method_id FROM payment_method WHERE method_id = $1 AND consumer_id = $2`,
+      [method_id, req.user.userId]
     );
-    const methodId = methodRes.rows[0].method_id;
+    if (methodCheck.rows.length === 0) return res.status(404).json({ error: 'Payment method not found' });
 
-    if (payment_method === 'mobile_banking') {
-      await client.query(
-        `INSERT INTO mobile_banking (method_id, provider_name, phone_num) VALUES ($1, $2, $3)`,
-        [methodId, provider_name || 'bKash', phone_num]
-      );
-    } else if (payment_method === 'bank') {
-      await client.query(
-        `INSERT INTO bank (method_id, bank_name, account_num) VALUES ($1, $2, $3)`,
-        [methodId, provider_name || 'Unknown', account_num || phone_num]
-      );
-    }
-
-    // Insert payment — trigger fires and sets bill_document.bill_status = 'PAID'
+    // Insert payment — trigger fires and sets bill_status = 'PAID'
     const paymentRes = await client.query(`
       INSERT INTO payment (bill_document_id, method_id, payment_amount, payment_date, status)
       VALUES ($1, $2, $3, CURRENT_TIMESTAMP, 'Completed')
       RETURNING payment_id
-    `, [bill_document_id, methodId, payment_amount]);
+    `, [bill_document_id, method_id, payment_amount]);
 
     await client.query('COMMIT');
-    res.status(201).json({
-      message: 'Payment successful',
-      payment_id: paymentRes.rows[0].payment_id,
-    });
+    res.status(201).json({ message: 'Payment successful', payment_id: paymentRes.rows[0].payment_id });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error(err);

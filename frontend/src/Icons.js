@@ -2,10 +2,6 @@
 // All icons are hand-crafted SVGs. Use size and color props to control them.
 // Usage: import { ElectricityIcon, WaterIcon, NavIcons } from '../Icons';
 
-const iconBase = (size, viewBox, children) => ({
-  width: size, height: size, viewBox, fill: 'none',
-});
-
 export const ElectricityIcon = ({ size = 24, color = '#fff' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <path d="M13 2L4.5 13.5H11L10 22L19.5 10.5H13L13 2Z"
@@ -103,11 +99,43 @@ export const RegionIcon = ({ size = 20, color = 'currentColor' }) => (
   </svg>
 );
 
-export const ConnectionIcon = ({ size = 20, color = 'currentColor' }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <circle cx="5"  cy="12" r="3" stroke={color} strokeWidth="1.5" fill="none"/>
-    <circle cx="19" cy="12" r="3" stroke={color} strokeWidth="1.5" fill="none"/>
-    <path d="M8 12H16" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 2"/>
+export const ConnectionIcon = ({ size = 20, color = "currentColor" }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M17 19a1 1 0 0 1-1-1v-2a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2a1 1 0 0 1-1 1z"/>
+    <path d="M17 21v-2"/>
+    <path d="M19 14V6.5a1 1 0 0 0-7 0v11a1 1 0 0 1-7 0V10"/>
+    <path d="M21 21v-2"/>
+    <path d="M3 5V3"/>
+    <path d="M4 10a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2a2 2 0 0 1-2 2z"/>
+    <path d="M7 5V3"/>
+  </svg>
+);
+
+export const ApplicationIcon = ({ size = 20, color = "currentColor" }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <path d="M8 12h8" />
+    <path d="M12 8v8" />
   </svg>
 );
 
@@ -170,4 +198,5 @@ export const NavIcons = {
   meter:      MeterIcon,
   region:     RegionIcon,
   connection: ConnectionIcon,
+  application: ApplicationIcon,
 };
