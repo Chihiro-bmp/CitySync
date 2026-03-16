@@ -126,7 +126,7 @@ const ConsumerDashboard = () => {
   // ── Derived stats ──────────────────────────────────────────────────────────
   const totalDue      = bills.filter(b => b.status !== 'Paid').reduce((s, b) => s + parseFloat(b.amount || 0), 0);
   const overdueBills  = bills.filter(b => b.status === 'Overdue');
-  const activeConn    = connections.filter(c => c.connection_status === 'Connected');
+  const activeConn = connections.filter(c => ['Active', 'Connected'].includes(c.connection_status));
   const openComplaints = complaints.filter(c => c.status !== 'Resolved').length;
 
   // ── Skeleton loading ───────────────────────────────────────────────────────

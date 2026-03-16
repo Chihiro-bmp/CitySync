@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../Layout/ThemeContext';
 import { login as loginApi } from '../../services/api';
-import { tokens, fonts } from '../../theme';
+import { tokens, fonts, getTimePalette } from '../../theme';
 import { SunIcon, MoonIcon } from '../../Icons';
 
 const Login = () => {
@@ -18,6 +18,8 @@ const Login = () => {
   const { isDark, toggle } = useTheme();
   const navigate = useNavigate();
   const t = tokens[isDark ? 'dark' : 'light'];
+  const palette = getTimePalette();
+  const tp = isDark ? palette.dark : palette.light;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -49,7 +51,7 @@ const Login = () => {
   });
 
   return (
-    <div style={{ minHeight:'100vh', background: isDark ? '#080C18' : '#F5F6FA', display:'flex', transition:'background 0.35s', fontFamily:fonts.ui }}>
+    <div style={{ minHeight:'100vh', background: tp.bg, display:'flex', transition:'background 0.35s', fontFamily:fonts.ui }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Syne:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap');`}</style>
 
       {/* Left panel */}

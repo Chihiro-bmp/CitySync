@@ -128,7 +128,7 @@ const UsageHistory = () => {
       label: `Previous (${period})`,
       color: isDark ? '#2A3550' : '#C4CADB',
       points: prevMonths.length
-        ? prevMonths.map((m, i) => ({ label: allMonths[i]?.label || m.label, value: Math.round(m.value) }))
+        ? prevMonths.map((m) => ({ label: m.label, value: Math.round(m.value) }))
         : allMonths.map(m => ({ label: m.label, value: 0 })),
     },
   ];
