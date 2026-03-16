@@ -16,7 +16,7 @@ const RegionList = () => {
   const fetchRegions = async () => {
     try {
       const response = await getRegions();
-      setRegions(response.data);
+      setRegions(response.data.data || []); // FIX: was response.data, backend returns { count, data: [] }
       setLoading(false);
     } catch (err) {
       setError('Failed to fetch regions');
@@ -28,9 +28,9 @@ const RegionList = () => {
     if (window.confirm('Are you sure you want to delete this region?')) {
       try {
         await deleteRegion(id);
-        fetchRegions(); // Refresh list
+        fetchRegions();
       } catch (err) {
-        alert('Failed to delete region');
+        alert(err.response?.data?.error || 'Cannot delete — region may be in use');
       }
     }
   };
@@ -42,43 +42,50 @@ const RegionList = () => {
     <div className="region-list-container">
       <div className="list-header">
         <h2>Regions</h2>
-        <button onClick={() => navigate('/regions/new')} className="btn-primary">
+        <button onClick={() => navigate('/employee/regions/new')} className="btn-primary"> {/* FIX: was /regions/new */}
           Add New Region
         </button>
       </div>
-      
+
       <table className="data-table">
         <thead>
-  <tr>
-    <th>ID</th>
-    <th>Region Name</th>
-    <th>Postal Code</th>
-    <th>Actions</th>
-  </tr>
-</thead>
-<tbody>
-  {regions.map((region) => (
-    <tr key={region.region_id}>
-      <td>{region.region_id}</td>
-      <td>{region.region_name}</td>
-      <td>{region.postal_code}</td>
-      <td>
-        <button
-          onClick={() => navigate(`/regions/edit/${region.region_id}`)}
-          className="btn-edit"
-        >
-          Edit
-        </button>
-        <button
-          onClick={() => handleDelete(region.region_id)}
-          className="btn-delete"
-        >
-          Delete
-        </button>
-      </td>
-    </tr>
-  ))}
-</tbody>
+          <tr>
+            <th>ID</th>
+            <th>Region Name</th>
+            <th>Postal Code</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {regions.map((region) => (
+            <tr key={region.region_id}>
+              <td>{region.region_id}</td>
+              <td>{region.region_name}</td>
+              <td>{region.postal_code}</td>
+              <td>
+                <button
+                  onClick={() => navigate(`/employee/regions/edit/${region.region_id}`)} // FIX: was /regions/edit/
+                  className="btn-edit"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDelete(region.region_id)}
+                  className="btn-delete"
+                >
+                  Delete
+                </button>
+              </td>
+            </tr>
+          ))}
+          {regions.length === 0 && (
+            <tr>
+              <td colSpan="4" style={{ textAlign: 'center', padding: '20px', opacity: 0.5 }}>
+                No regions found
+              </td>
+            </tr>
+          )}
+        </tbody>
       </table>
     </div>
   );

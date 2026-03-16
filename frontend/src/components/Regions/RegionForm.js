@@ -4,10 +4,10 @@ import { createRegion } from '../../services/api';
 import './Regions.css';
 
 const RegionForm = () => {
-    const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState({
     region_name: '',
     postal_code: '',
-    });
+  });
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
@@ -18,10 +18,9 @@ const RegionForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
     try {
       await createRegion(formData);
-      navigate('/regions');
+      navigate('/employee/regions'); // FIX: was /regions
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create region');
     }
@@ -53,12 +52,12 @@ const RegionForm = () => {
             placeholder="e.g., 1216"
             required
           />
-        </div>    
+        </div>
         <div className="form-actions">
           <button type="submit" className="btn-primary">Create</button>
           <button
             type="button"
-            onClick={() => navigate('/regions')}
+            onClick={() => navigate('/employee/regions')} // FIX: was /regions
             className="btn-cancel"
           >
             Cancel

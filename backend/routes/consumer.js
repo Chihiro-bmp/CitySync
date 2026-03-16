@@ -491,7 +491,7 @@ router.get('/profile', async (req, res) => {
         a.email,
         a.account_type   AS role,
         a.created_at,
-        a.avatar_b64,
+        a.avatar_url,
         c.consumer_type,
         c.registration_date,
         addr.house_num,
@@ -549,18 +549,18 @@ router.put('/profile', async (req, res) => {
 
 // ── PUT /api/consumer/avatar ──────────────────────────────────────────────────
 router.put('/avatar', async (req, res) => {
-  const { avatar_b64 } = req.body;
-  if (!avatar_b64) return res.status(400).json({ error: 'avatar_b64 is required' });
+  const { avatar_url } = req.body;
+  if (!avatar_url) return res.status(400).json({ error: 'avatar_url is required' });
   // Limit to ~2MB base64
-  if (avatar_b64.length > 2_800_000)
+  if (avatar_url.length > 2_800_000)
     return res.status(400).json({ error: 'Image too large. Max 2MB.' });
 
   try {
     await pool.query(
-      `UPDATE account SET avatar_b64 = $1 WHERE person_id = $2`,
-      [avatar_b64, req.user.userId]
+      `UPDATE account SET avatar_url = $1 WHERE person_id = $2`,
+      [avatar_url, req.user.userId]
     );
-    res.json({ message: 'Avatar updated', avatar_b64 });
+    res.json({ message: 'Avatar updated', avatar_url });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to update avatar' });

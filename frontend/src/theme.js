@@ -205,8 +205,8 @@ export const navItems = {
     { label:'Connections',  path:'/employee/connections',   icon:'connection' },
     { label:'Consumers',    path:'/employee/consumers',     icon:'profile'    },
     { label:'Tariffs',      path:'/employee/tariffs',       icon:'bill'       },
+    { label:'Applications', path:'/employee/applications',  icon:'application'},
     { label:'Complaints',   path:'/employee/complaints',    icon:'complaint'  },
     { label:'Field Workers',path:'/employee/field-workers', icon:'jobs'       },
-    { label:'Analytics',    path:'/employee/analytics',     icon:'usage'      },
   ],
 };
