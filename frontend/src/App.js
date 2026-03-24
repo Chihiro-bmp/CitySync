@@ -6,6 +6,8 @@ import { ThemeProvider } from './components/Layout';
 import { Layout } from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 
+//import TailwindTest from './TailwindTest';
+
 // Auth
 import Login    from './components/Auth/Login';
 import Register from './components/Auth/Register';
@@ -49,6 +51,12 @@ const RootRedirect = () => {
   };
   return <Navigate to={home[user?.role] || '/login'} replace />;
 };
+
+
+
+// function App() {
+//   return <TailwindTest />;
+// }
 
 function App() {
   return (
