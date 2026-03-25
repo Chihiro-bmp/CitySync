@@ -1,127 +1,18 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, use } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../Layout/ThemeContext';
 import { tokens, fonts, utilities, statusColors } from '../../theme';
 import { ElectricityIcon, WaterIcon, GasIcon, BillIcon } from '../../Icons';
 import { DonutChart, ChartLegend } from '../Charts';
+import PayBillModal from './PayBillModal';
+import BillDetail from './BillDetail';
 
 const UtilIcons = { electricity: ElectricityIcon, water: WaterIcon, gas: GasIcon };
 const FILTERS   = ['All', 'Overdue', 'Pending', 'Paid'];
-
-// ── Payment Modal ─────────────────────────────────────────────────────────────
-// ── Method type display helpers (mirrors Payments.js) ────────────────────────
-const METHOD_LABELS = { bank:'Bank Transfer', mobile_banking:'Mobile Banking', google_pay:'Google Pay' };
-const METHOD_GRADS  = { bank:'linear-gradient(135deg,#3B6FFF,#2952D9)', mobile_banking:'linear-gradient(135deg,#E91E8C,#FF5C8A)', google_pay:'linear-gradient(135deg,#4285F4,#34A853)' };
-const methodSub = (m) => {
-  if (m.bank_name)            return `${m.bank_name} ···· ${m.account_num?.slice(-4)}`;
-  if (m.provider_name)        return `${m.provider_name} · ${m.mb_phone}`;
-  if (m.google_account_email) return m.google_account_email;
-  return '';
-};
-
-const PayModal = ({ bill, onClose, onSuccess, t, isDark }) => {
-  const { authFetch } = useAuth();
-  const [methods, setMethods]     = useState([]);
-  const [selectedId, setSelectedId] = useState(null);
-  const [loadingMethods, setLoadingMethods] = useState(true);
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState('');
-
-  useEffect(() => {
-    authFetch('/api/consumer/payment-methods').then(r => r.json()).then(data => {
-      const list = Array.isArray(data) ? data : [];
-      setMethods(list);
-      // Auto-select default or first
-      const def = list.find(m => m.is_default) || list[0];
-      if (def) setSelectedId(def.method_id);
-    }).catch(() => {}).finally(() => setLoadingMethods(false));
-  }, [authFetch]);
-
-  const handlePay = async () => {
-    if (!selectedId) { setError('Please select a payment method'); return; }
-    setLoading(true); setError('');
-    try {
-      const res  = await authFetch('/api/consumer/payments', { method:'POST', body: JSON.stringify({ bill_document_id: bill.bill_document_id, payment_amount: bill.amount, method_id: selectedId }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      onSuccess();
-    } catch (err) { setError(err.message || 'Payment failed'); }
-    finally       { setLoading(false); }
-  };
-
-  const util = utilities[bill.utility_tag] || utilities.payment;
-  const Icon = UtilIcons[bill.utility_tag] || BillIcon;
-
-  return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={onClose}>
-      <div style={{ background:t.bgCard, border:`1px solid ${t.border}`, borderRadius:20, padding:28, width:'100%', maxWidth:440 }} onClick={e => e.stopPropagation()}>
-
-        {/* Bill header */}
-        <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:22 }}>
-          <div style={{ width:44, height:44, borderRadius:13, background:util.gradient, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:`0 4px 12px ${util.glow}` }}>
-            <Icon size={22} color="#fff" />
-          </div>
-          <div>
-            <div style={{ fontSize:16, fontWeight:600, color:t.text }}>{bill.utility_name} Bill</div>
-            <div style={{ fontSize:12, color:t.textSub, fontFamily:fonts.mono }}>{bill.period}</div>
-          </div>
-          <button onClick={onClose} style={{ marginLeft:'auto', background:'none', border:'none', cursor:'pointer', color:t.textMuted, fontSize:22, lineHeight:1 }}>×</button>
-        </div>
-
-        {/* Amount */}
-        <div style={{ background: isDark ? '#0A1020' : '#F8FAFF', borderRadius:12, padding:'16px 20px', marginBottom:22, textAlign:'center' }}>
-          <div style={{ fontSize:11, color:t.textMuted, fontFamily:fonts.mono, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:4 }}>Amount Due</div>
-          <div style={{ fontSize:32, fontWeight:700, color:t.text, letterSpacing:'-0.5px' }}>৳ {parseFloat(bill.amount).toLocaleString()}</div>
-        </div>
-
-        {/* Payment method picker */}
-        <div style={{ marginBottom:18 }}>
-          <div style={{ fontSize:12, fontWeight:500, color:t.textSub, marginBottom:10 }}>Pay With</div>
-          {loadingMethods ? (
-            <div style={{ height:60, borderRadius:12, background:t.bgCard, border:`1px solid ${t.border}`, animation:'pulse 1.5s infinite' }} />
-          ) : methods.length === 0 ? (
-            <div style={{ padding:'16px', borderRadius:12, border:`1.5px dashed ${t.border}`, textAlign:'center' }}>
-              <div style={{ fontSize:13, color:t.textSub, marginBottom:8 }}>No saved payment methods</div>
-              <a href="/consumer/payments" style={{ fontSize:12, color:t.primary, fontWeight:500 }}>Add a payment method →</a>
-            </div>
-          ) : (
-            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              {methods.map(m => (
-                <button key={m.method_id} onClick={() => setSelectedId(m.method_id)}
-                  style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:12, border:`1.5px solid ${selectedId === m.method_id ? t.primary : t.border}`, background: selectedId === m.method_id ? (isDark ? 'rgba(59,111,255,0.1)' : '#EEF2FF') : 'transparent', cursor:'pointer', transition:'all 0.15s', textAlign:'left' }}>
-                  <div style={{ width:32, height:32, borderRadius:9, background:METHOD_GRADS[m.method_name], display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                    <div style={{ width:14, height:14, borderRadius:'50%', background:'rgba(255,255,255,0.8)' }} />
-                  </div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:13, fontWeight:500, color:t.text }}>{METHOD_LABELS[m.method_name] || m.method_name}</div>
-                    <div style={{ fontSize:11, color:t.textSub, fontFamily:fonts.mono }}>{methodSub(m)}</div>
-                  </div>
-                  {m.is_default && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:100, background:isDark?'rgba(59,111,255,0.15)':'#EEF2FF', color:t.primary, fontFamily:fonts.mono, flexShrink:0 }}>Default</span>}
-                  <div style={{ width:16, height:16, borderRadius:'50%', border:`2px solid ${selectedId===m.method_id ? t.primary : t.border}`, background:selectedId===m.method_id ? t.primary : 'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                    {selectedId===m.method_id && <div style={{ width:6, height:6, borderRadius:'50%', background:'#fff' }} />}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}`}</style>
-        {error && <div style={{ fontSize:13, color: isDark ? '#F87171' : '#B91C1C', marginBottom:14, padding:'10px 14px', borderRadius:8, background: isDark ? '#2D0C0C' : '#FEE2E2' }}>{error}</div>}
-
-        <button onClick={handlePay} disabled={loading || !selectedId || methods.length === 0}
-          style={{ width:'100%', padding:'13px', borderRadius:10, border:'none', background: loading || !selectedId ? t.textMuted : 'linear-gradient(135deg,#3B6FFF,#2952D9)', color:'#fff', fontSize:15, fontWeight:600, fontFamily:fonts.ui, cursor: loading || !selectedId ? 'not-allowed' : 'pointer', boxShadow: loading || !selectedId ? 'none' : '0 4px 16px rgba(59,111,255,0.3)' }}>
-          {loading ? 'Processing...' : `Pay ৳ ${parseFloat(bill.amount).toLocaleString()}`}
-        </button>
-      </div>
-    </div>
-  );
-};
+const BILL_TYPES = ['All', 'Prepaid', 'Postpaid'];
 
 // ── Bill Card ─────────────────────────────────────────────────────────────────
-const BillCard = ({ bill, onPay, t, isDark }) => {
-  const navigate = useNavigate();
+const BillCard = ({ bill, onPay, onOpenDetail, t, isDark }) => {
   const util     = utilities[bill.utility_tag] || utilities.payment;
   const Icon     = UtilIcons[bill.utility_tag] || BillIcon;
   const status   = statusColors[bill.status]   || statusColors['Pending'];
@@ -138,7 +29,7 @@ const BillCard = ({ bill, onPay, t, isDark }) => {
             <Icon size={18} color="#fff" />
           </div>
           <div>
-            <div style={{ fontSize:14, fontWeight:600, color:t.text }}>{bill.utility_name}</div>
+            <div style={{ fontSize:14, fontWeight:600, color:t.text }}>{bill.connection_name}</div>
             <div style={{ fontSize:11, color:t.textSub, fontFamily:fonts.mono }}>{bill.period}</div>
           </div>
         </div>
@@ -147,19 +38,27 @@ const BillCard = ({ bill, onPay, t, isDark }) => {
         </span>
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:14, padding:'12px 0', borderTop:`1px solid ${t.border}`, borderBottom:`1px solid ${t.border}` }}>
-        {[
-          { label:'Amount',   val:`৳ ${parseFloat(bill.amount).toLocaleString()}` },
-          { label:'Units',    val:`${bill.unit_consumed||'—'}` },
-          { label:'Due',      val: bill.due_date ? new Date(bill.due_date).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—' },
-        ].map(item => (
-          <div key={item.label}>
-            <div style={{ fontSize:10, color:t.textMuted, fontFamily:fonts.mono, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:3 }}>{item.label}</div>
-            <div style={{ fontSize:14, fontWeight:600, color:t.text }}>{item.val}</div>
-          </div>
-        ))}
+        {(() => {
+          const unitsVal = (bill.bill_type?.toLowerCase() === 'prepaid') ? (bill.energy_amount || '—') : (bill.unit_consumed || '—');
+          const dateLabel = isPayable ? 'Due' : 'Paid';
+          const dateVal = isPayable ? bill.due_date : bill.payment_date;
+          const dateDisplay = dateVal ? new Date(dateVal).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
+          const items = [
+            { label: 'Amount', val: `৳ ${parseFloat(bill.amount).toLocaleString()}` },
+            { label: 'Units',  val: unitsVal },
+            { label: dateLabel, val: dateDisplay },
+          ];
+
+          return items.map(item => (
+            <div key={item.label}>
+              <div style={{ fontSize:10, color:t.textMuted, fontFamily:fonts.mono, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:3 }}>{item.label}</div>
+              <div style={{ fontSize:14, fontWeight:600, color:t.text }}>{item.val}</div>
+            </div>
+          ));
+        })()}
       </div>
       <div style={{ display:'flex', gap:10 }}>
-        <button onClick={() => navigate(`/consumer/bills/${bill.bill_document_id}`)} style={{ flex:1, padding:'9px', borderRadius:9, border:`1.5px solid ${t.border}`, background:'transparent', color:t.text, fontSize:13, fontWeight:500, fontFamily:fonts.ui, cursor:'pointer' }}>Details</button>
+        <button onClick={() => onOpenDetail(bill.bill_document_id)} style={{ flex:1, padding:'9px', borderRadius:9, border:`1.5px solid ${t.border}`, background:'transparent', color:t.text, fontSize:13, fontWeight:500, fontFamily:fonts.ui, cursor:'pointer' }}>Details</button>
         {isPayable && <button onClick={() => onPay(bill)} style={{ flex:1, padding:'9px', borderRadius:9, border:'none', background:'linear-gradient(135deg,#3B6FFF,#2952D9)', color:'#fff', fontSize:13, fontWeight:600, fontFamily:fonts.ui, cursor:'pointer', boxShadow:'0 3px 10px rgba(59,111,255,0.3)' }}>Pay Now</button>}
       </div>
     </div>
@@ -173,9 +72,13 @@ const MyBills = () => {
   const t                           = tokens[isDark ? 'dark' : 'light'];
 
   const [bills, setBills]           = useState([]);
+  const [connections, setConnections] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [filter, setFilter]         = useState('All');
+  const [typeFilter, setTypeFilter] = useState('All');
+  const [connectionFilter, setConnectionFilter] = useState('All');
   const [payingBill, setPayingBill] = useState(null);
+  const [detailBillId, setDetailBillId] = useState(null);
   const [success, setSuccess]       = useState(false);
 
   const fetchBills = useCallback(async () => {
@@ -219,7 +122,44 @@ const MyBills = () => {
     return { label: u.label, value: count, color, pct: 0 };
   }).filter(u => u.value > 0).map(u => ({ ...u, pct: u.value / (bills.length||1) }));
 
-  const filtered    = filter === 'All' ? bills : bills.filter(b => b.status === filter);
+  // derive connections list from bills for connection tabs
+  // const connections = React.useMemo(() => {
+  //   const m = new Map();
+  //   bills.forEach(b => {
+  //     const id = b.connection_id ?? b.connection_name;
+  //     if (!m.has(id)) m.set(id, { id, name: b.connection_name, utility: b.utility_tag });
+  //   });
+  //   return Array.from(m.values());
+  // }, [bills]);
+
+  const fetchConnections = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await authFetch('/api/consumer/connections');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          // Keep only id, name and optional utility type to avoid passing large payload into state
+          const mapped = data.map(c => ({ id: c.connection_id, name: c.connection_name, utility: c.utility_tag, unit: c.unit_of_measurement }));
+          setConnections(mapped);
+          return;
+        }
+      } else {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to fetch connections');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [authFetch]);
+
+  useEffect(() => { fetchConnections(); }, [fetchConnections]);
+
+  const filteredByConnection = connectionFilter === 'All' ? bills : bills.filter(b => (b.connection_id ?? b.connection_name) === connectionFilter);
+  const filteredByType = typeFilter === 'All' ? filteredByConnection : filteredByConnection.filter(b => (b.bill_type && b.bill_type.toLowerCase() === typeFilter.toLowerCase()));
+  const filtered    = filter === 'All' ? filteredByType : filteredByType.filter(b => b.status === filter);
   const totalDue    = bills.filter(b=>['Pending','Overdue'].includes(b.status)).reduce((s,b)=>s+parseFloat(b.amount||0),0);
   const totalAmount = bills.reduce((s,b)=>s+parseFloat(b.amount||0),0);
 
@@ -291,11 +231,35 @@ const MyBills = () => {
         ))}
       </div>
 
+      {/* Connection tabs (copied style from UsageHistory) */}
+      <div style={{ display:'flex', gap:10, marginBottom:10, flexWrap:'wrap' }}>
+        {[{ id: 'All', name: 'All' }, ...(connections || [])].map(tab => {
+          const active = connectionFilter === tab.id;
+          const u = utilities[tab.utility] || utilities.payment;
+          const Ic = UtilIcons[tab.utility] || BillIcon;
+          return (
+            <button key={tab.id} onClick={() => setConnectionFilter(tab.id)} style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 18px', borderRadius:12, border:`1.5px solid ${active ? 'transparent' : t.border}`, background: active ? u.gradient : (isDark ? t.bgCard : '#fff'), cursor:'pointer', transition:'all 0.2s', boxShadow: active ? `0 4px 14px ${u.glow}` : 'none' }}>
+              <Ic size={15} color={active ? '#fff' : t.textSub} />
+              <span style={{ fontSize:13, fontWeight:500, color: active ? '#fff' : t.textSub, textTransform:'capitalize' }}>{tab.name}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Type tabs (Prepaid / Postpaid) */}
+      <div style={{ display:'flex', gap:8, marginBottom:10, flexWrap:'wrap' }}>
+        {BILL_TYPES.map(bt => (
+          <button key={bt} onClick={() => setTypeFilter(bt)} style={{ padding:'6px 14px', borderRadius:100, border:`1.5px solid ${typeFilter===bt ? t.primary : t.border}`, background: typeFilter===bt ? (isDark?'rgba(59,111,255,0.12)':'#F3F7FF') : 'transparent', color: typeFilter===bt ? t.primary : t.textSub, fontSize:13, fontWeight:500, fontFamily:fonts.ui, cursor:'pointer', transition:'all 0.15s' }}>
+            {bt}
+          </button>
+        ))}
+      </div>
+
       {/* Filter tabs */}
       <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
         {FILTERS.map(f => (
           <button key={f} onClick={() => setFilter(f)} style={{ padding:'7px 16px', borderRadius:100, border:`1.5px solid ${filter===f ? t.primary : t.border}`, background: filter===f ? (isDark?'rgba(59,111,255,0.15)':'#EEF2FF') : 'transparent', color: filter===f ? t.primary : t.textSub, fontSize:13, fontWeight:500, fontFamily:fonts.ui, cursor:'pointer', transition:'all 0.15s' }}>
-            {f} {f !== 'All' && <span style={{ marginLeft:5, fontSize:11, opacity:0.7 }}>{bills.filter(b=>b.status===f).length}</span>}
+            {f} {f !== 'All' && <span style={{ marginLeft:5, fontSize:11, opacity:0.7 }}>{bills.filter(b=> (connectionFilter==='All' || ((b.connection_id ?? b.connection_name) === connectionFilter)) && (typeFilter==='All' || (b.bill_type && b.bill_type.toLowerCase()===typeFilter.toLowerCase())) && b.status===f).length}</span>}
           </button>
         ))}
       </div>
@@ -314,11 +278,12 @@ const MyBills = () => {
         </div>
       ) : (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))', gap:16 }}>
-          {filtered.map(bill => <BillCard key={bill.bill_document_id} bill={bill} onPay={setPayingBill} t={t} isDark={isDark} />)}
+          {filtered.map(bill => <BillCard key={bill.bill_document_id} bill={bill} onPay={setPayingBill} onOpenDetail={setDetailBillId} t={t} isDark={isDark} />)}
         </div>
       )}
 
-      {payingBill && <PayModal bill={payingBill} onClose={() => setPayingBill(null)} onSuccess={handlePaySuccess} t={t} isDark={isDark} />}
+      {payingBill && <PayBillModal bill={payingBill} onClose={() => setPayingBill(null)} onSuccess={handlePaySuccess} t={t} isDark={isDark} />}
+      {detailBillId && <BillDetail billId={detailBillId} onClose={() => setDetailBillId(null)} onBillPaid={handlePaySuccess} />}
     </div>
   );
 };

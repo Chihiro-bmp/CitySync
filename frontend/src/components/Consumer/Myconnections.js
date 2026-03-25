@@ -2,52 +2,48 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../Layout/ThemeContext';
-import { tokens, fonts, utilities } from '../../theme';
+import { tokens, fonts, utilities, statusColors } from '../../theme';
 import { ElectricityIcon, WaterIcon, GasIcon, ConnectionIcon } from '../../Icons';
 
 const UTIL_ICONS  = { electricity: ElectricityIcon, water: WaterIcon, gas: GasIcon };
-const UTIL_COLORS = {
-  electricity: { bg: 'linear-gradient(135deg,#F5A623,#FF6B00)', glow: 'rgba(245,166,35,0.3)'  },
-  water:       { bg: 'linear-gradient(135deg,#00C4FF,#0077FF)', glow: 'rgba(0,196,255,0.3)'   },
-  gas:         { bg: 'linear-gradient(135deg,#4ADE80,#16A34A)', glow: 'rgba(74,222,128,0.3)'  },
-};
-
-const STATUS_STYLE = {
-  Active:       { lb:'#DCFCE7', lc:'#16A34A', db:'#0D2E1A', dc:'#4ADE80' },
-  Connected:    { lb:'#DCFCE7', lc:'#16A34A', db:'#0D2E1A', dc:'#4ADE80' },
-  Inactive:     { lb:'#FEF9C3', lc:'#B45309', db:'#2D1F07', dc:'#FBBF24' },
-  Suspended:    { lb:'#FEE2E2', lc:'#B91C1C', db:'#2D0C0C', dc:'#F87171' },
-  Disconnected: { lb:'#FEE2E2', lc:'#B91C1C', db:'#2D0C0C', dc:'#F87171' },
-  Pending:      { lb:'#F3E8FF', lc:'#7E22CE', db:'#200D38', dc:'#C084FC' },
-};
 
 // ── Connection Card ───────────────────────────────────────────────────────────
-const ConnectionCard = ({ conn, t, isDark }) => {
+const ConnectionCard = ({ conn, t, isDark, onOpen }) => {
   const utilKey = conn.utility_tag;
-  const util    = UTIL_COLORS[utilKey] || UTIL_COLORS.electricity;
+  const util    = utilities[utilKey] || utilities.electricity;
   const Icon    = UTIL_ICONS[utilKey]  || ElectricityIcon;
-  const sc      = STATUS_STYLE[conn.connection_status] || STATUS_STYLE['Inactive'];
+  const sc      = statusColors[conn.connection_status] || statusColors['Inactive'];
+  const connectionName = conn.connection_name || conn.utility_name;
 
   return (
     <div style={{
       background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: 16,
       padding: 22, position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.18s',
     }}
+      role="button"
+      tabIndex={0}
+      aria-label={`Open details for connection ${conn.connection_id}`}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
       onMouseEnter={e => e.currentTarget.style.boxShadow = `0 6px 24px ${util.glow}`}
       onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
     >
       {/* Glow blob */}
-      <div style={{ position:'absolute', top:-30, right:-30, width:100, height:100, borderRadius:'50%', background:util.bg, opacity:0.08, filter:'blur(24px)', pointerEvents:'none' }} />
+      <div style={{ position:'absolute', top:-30, right:-30, width:100, height:100, borderRadius:'50%', background:util.gradient, opacity:0.08, filter:'blur(24px)', pointerEvents:'none' }} />
 
       {/* Header */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-          <div style={{ width:42, height:42, borderRadius:13, background:util.bg, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:`0 4px 12px ${util.glow}`, flexShrink:0 }}>
+          <div style={{ width:42, height:42, borderRadius:13, background:util.gradient, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:`0 4px 12px ${util.glow}`, flexShrink:0 }}>
             <Icon size={20} color="#fff" />
           </div>
           <div>
-            <div style={{ fontSize:15, fontWeight:600, color:t.text, textTransform:'capitalize' }}>{conn.utility_name}</div>
-            <div style={{ fontSize:11, color:t.textSub, fontFamily:fonts.mono }}>ID #{conn.connection_id}</div>
+            <div style={{ fontSize:15, fontWeight:600, color:t.text, textTransform:'capitalize' }}>{connectionName}</div>
           </div>
         </div>
         <span style={{ fontSize:11, fontWeight:600, padding:'4px 12px', borderRadius:100, background:isDark ? sc.db : sc.lb, color:isDark ? sc.dc : sc.lc }}>
@@ -60,8 +56,6 @@ const ConnectionCard = ({ conn, t, isDark }) => {
         {[
           { label:'Type',          val: conn.connection_type   },
           { label:'Payment',       val: conn.payment_type      },
-          { label:'Tariff',        val: conn.tariff_name       },
-          { label:'Billing',       val: conn.billing_method    },
           { label:'Since',         val: conn.connection_date ? new Date(conn.connection_date).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : '—' },
           { label:'This Month',    val: `${parseFloat(conn.units_used||0).toFixed(1)} ${conn.unit_of_measurement}` },
         ].map(item => (
@@ -80,6 +74,28 @@ const ConnectionCard = ({ conn, t, isDark }) => {
         <span style={{ fontSize:12, color:t.textSub }}>
           {conn.house_num}, {conn.street_name}, {conn.region_name}
         </span>
+      </div>
+
+      <div style={{ marginTop:14, display:'flex', justifyContent:'flex-end' }}>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen();
+          }}
+          style={{
+            border:'none',
+            borderRadius:8,
+            padding:'7px 10px',
+            cursor:'pointer',
+            fontSize:12,
+            fontWeight:600,
+            fontFamily:fonts.ui,
+            background:isDark ? 'rgba(77,125,255,0.18)' : '#EEF2FF',
+            color:t.primary,
+          }}
+        >
+          View Details
+        </button>
       </div>
     </div>
   );
@@ -111,13 +127,13 @@ const MyConnections = () => {
 
   useEffect(() => { fetchConnections(); }, [fetchConnections]);
 
-  const filtered = filter === 'All' ? connections : connections.filter(c => c.connection_status === filter);
+  const filtered = filter === 'All' ? connections : connections.filter(c => (c.connection_status || '').toLowerCase() === filter.toLowerCase());
 
   const statCards = [
-    { label:'Total',       val: connections.length,                                                          grad:'linear-gradient(135deg,#3B6FFF,#00C4FF)', glow:'rgba(59,111,255,0.25)'  },
-    { label:'Active',      val: connections.filter(c => ['Active','Connected'].includes(c.connection_status)).length, grad:'linear-gradient(135deg,#22C55E,#16A34A)', glow:'rgba(34,197,94,0.25)'   },
-    { label:'Suspended',   val: connections.filter(c => c.connection_status === 'Suspended').length,          grad:'linear-gradient(135deg,#F5A623,#FF6B00)', glow:'rgba(245,166,35,0.25)'  },
-    { label:'Disconnected',val: connections.filter(c => c.connection_status === 'Disconnected').length,       grad:'linear-gradient(135deg,#EF4444,#B91C1C)', glow:'rgba(239,68,68,0.25)'   },
+    { label:'Total',       val: connections.length,                                                                                         grad:'linear-gradient(135deg,#3B6FFF,#00C4FF)', glow:'rgba(59,111,255,0.25)'  },
+    { label:'Active',      val: connections.filter(c => ['active','connected'].includes((c.connection_status || '').toLowerCase())).length, grad:'linear-gradient(135deg,#22C55E,#16A34A)', glow:'rgba(34,197,94,0.25)'   },
+    { label:'Suspended',   val: connections.filter(c => (c.connection_status || '').toLowerCase() === 'suspended').length,                  grad:'linear-gradient(135deg,#F5A623,#FF6B00)', glow:'rgba(245,166,35,0.25)'  },
+    { label:'Disconnected',val: connections.filter(c => (c.connection_status || '').toLowerCase() === 'disconnected').length,               grad:'linear-gradient(135deg,#EF4444,#B91C1C)', glow:'rgba(239,68,68,0.25)'   },
   ];
 
   return (
@@ -155,7 +171,7 @@ const MyConnections = () => {
           <button key={f} onClick={() => setFilter(f)}
             style={{ padding:'7px 16px', borderRadius:100, border:`1.5px solid ${filter===f ? t.primary : t.border}`, background:filter===f ? (isDark?'rgba(59,111,255,0.15)':'#EEF2FF') : 'transparent', color:filter===f ? t.primary : t.textSub, fontSize:13, fontWeight:500, fontFamily:fonts.ui, cursor:'pointer', transition:'all 0.15s' }}>
             {f}
-            {f !== 'All' && <span style={{ marginLeft:5, fontSize:11, opacity:0.7 }}>{connections.filter(c => c.connection_status === f).length}</span>}
+            {f !== 'All' && <span style={{ marginLeft:5, fontSize:11, opacity:0.7 }}>{connections.filter(c => (c.connection_status || '').toLowerCase() === f.toLowerCase()).length}</span>}
           </button>
         ))}
       </div>
@@ -186,7 +202,15 @@ const MyConnections = () => {
         </div>
       ) : (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(340px,1fr))', gap:16 }}>
-          {filtered.map(conn => <ConnectionCard key={conn.connection_id} conn={conn} t={t} isDark={isDark} />)}
+          {filtered.map(conn => (
+            <ConnectionCard
+              key={conn.connection_id}
+              conn={conn}
+              t={t}
+              isDark={isDark}
+              onOpen={() => navigate(`/consumer/connections/${conn.connection_id}`)}
+            />
+          ))}
         </div>
       )}
     </div>

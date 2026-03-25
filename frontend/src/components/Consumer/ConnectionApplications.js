@@ -1,16 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../Layout/ThemeContext';
-import { tokens, fonts, statusColors } from '../../theme';
+import { tokens, fonts, statusColors, utilities } from '../../theme';
 import { ConnectionIcon, ElectricityIcon, WaterIcon, GasIcon } from '../../Icons';
+import NewApplicationModal from './NewApplicationModal';
 
 // ── Util icon map ─────────────────────────────────────────────────────────────
 const UTIL_ICONS = { electricity: ElectricityIcon, water: WaterIcon, gas: GasIcon };
-const UTIL_COLORS = {
-  electricity: { bg: 'linear-gradient(135deg,#F5A623,#FF6B00)', glow: 'rgba(245,166,35,0.3)' },
-  water:       { bg: 'linear-gradient(135deg,#00C4FF,#0077FF)', glow: 'rgba(0,196,255,0.3)' },
-  gas:         { bg: 'linear-gradient(135deg,#4ADE80,#16A34A)', glow: 'rgba(74,222,128,0.3)' },
-};
 
 // ── Step indicator ────────────────────────────────────────────────────────────
 const STEPS = ['Pending', 'Under Review', 'Approved', 'Connected'];
@@ -73,7 +69,7 @@ const StatusTimeline = ({ status, t, isDark }) => {
 // ── Application card ──────────────────────────────────────────────────────────
 const AppCard = ({ app, t, isDark }) => {
   const utilKey = app.utility_type?.toLowerCase();
-  const util    = UTIL_COLORS[utilKey] || UTIL_COLORS.electricity;
+  const util    = utilities[utilKey] || utilities.electricity;
   const Icon    = UTIL_ICONS[utilKey]  || ConnectionIcon;
   const sc      = statusColors[app.status] || statusColors['Pending'];
 
@@ -88,12 +84,12 @@ const AppCard = ({ app, t, isDark }) => {
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 11, background: util.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 3px 10px ${util.glow}`, flexShrink: 0 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 11, background: util.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 3px 10px ${util.glow}`, flexShrink: 0 }}>
             <Icon size={18} color="#fff" />
           </div>
           <div>
             <div style={{ fontSize: 14, fontWeight: 600, color: t.text, textTransform: 'capitalize' }}>{app.utility_type} Connection</div>
-            <div style={{ fontSize: 11, color: t.textSub, fontFamily: fonts.mono }}>#{app.application_id} · {new Date(app.application_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+            <div style={{ fontSize: 11, color: t.textSub, fontFamily: fonts.mono }}>{app.utility_name} · {new Date(app.application_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
@@ -112,7 +108,7 @@ const AppCard = ({ app, t, isDark }) => {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '12px 0', borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, marginBottom: 12 }}>
         {[
           { label: 'Type',    val: app.requested_connection_type },
-          { label: 'Address', val: app.address },
+          { label: 'Address', val: (app.address + (app.region_name ? `, ${app.region_name}` : '')) },
           app.review_date   && { label: 'Reviewed',  val: new Date(app.review_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) },
           app.approval_date && { label: 'Approved',  val: new Date(app.approval_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) },
           app.reviewed_by_name && { label: 'Reviewed By', val: app.reviewed_by_name },
@@ -126,124 +122,6 @@ const AppCard = ({ app, t, isDark }) => {
 
       {/* Progress timeline */}
       <StatusTimeline status={app.status} t={t} isDark={isDark} />
-    </div>
-  );
-};
-
-// ── New Application Modal ─────────────────────────────────────────────────────
-const NewAppModal = ({ onClose, onSuccess, t, isDark }) => {
-  const { authFetch } = useAuth();
-  const [form, setForm]     = useState({ utility_type: 'Electricity', requested_connection_type: 'Residential', address: '', priority: 'Normal' });
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
-
-  const handleSubmit = async () => {
-    if (!form.address.trim()) { setError('Address is required'); return; }
-    setLoading(true); setError('');
-    try {
-      const res  = await authFetch('/api/consumer/applications', { method: 'POST', body: JSON.stringify(form) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      onSuccess();
-    } catch (err) {
-      setError(err.message || 'Failed to submit application');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const Field = ({ label, children }) => (
-    <div style={{ marginBottom: 16 }}>
-      <label style={{ fontSize: 12, fontWeight: 500, color: t.textSub, display: 'block', marginBottom: 7 }}>{label}</label>
-      {children}
-    </div>
-  );
-
-  const selectStyle = {
-    width: '100%', padding: '10px 12px', borderRadius: 10,
-    border: `1.5px solid ${t.border}`,
-    background: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFF',
-    color: t.text, fontSize: 13, fontFamily: fonts.ui, outline: 'none', cursor: 'pointer',
-  };
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
-      <div style={{ background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: 20, padding: 28, width: '100%', maxWidth: 460 }} onClick={e => e.stopPropagation()}>
-
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg,#3B6FFF,#00C4FF)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(59,111,255,0.35)' }}>
-            <ConnectionIcon size={20} color="#fff" />
-          </div>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: t.text }}>New Connection Application</div>
-            <div style={{ fontSize: 12, color: t.textSub, marginTop: 2 }}>Submit a request for a new utility connection</div>
-          </div>
-          <button onClick={onClose} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: t.textMuted, fontSize: 22, lineHeight: 1 }}>×</button>
-        </div>
-
-        {/* Utility type */}
-        <Field label="Utility Type">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            {['Electricity', 'Water', 'Gas'].map(u => {
-              const key  = u.toLowerCase();
-              const col  = UTIL_COLORS[key];
-              const Icon = UTIL_ICONS[key];
-              const active = form.utility_type === u;
-              return (
-                <button key={u} onClick={() => setForm(f => ({ ...f, utility_type: u }))} style={{ padding: '12px 8px', borderRadius: 12, border: `1.5px solid ${active ? 'transparent' : t.border}`, background: active ? col.bg : 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, transition: 'all 0.15s', boxShadow: active ? `0 4px 14px ${col.glow}` : 'none' }}>
-                  <Icon size={18} color={active ? '#fff' : t.textSub} />
-                  <span style={{ fontSize: 12, fontWeight: 500, color: active ? '#fff' : t.textSub }}>{u}</span>
-                </button>
-              );
-            })}
-          </div>
-        </Field>
-
-        {/* Connection type */}
-        <Field label="Connection Type">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            {['Residential', 'Commercial'].map(type => (
-              <button key={type} onClick={() => setForm(f => ({ ...f, requested_connection_type: type }))} style={{ padding: '10px', borderRadius: 10, border: `1.5px solid ${form.requested_connection_type === type ? t.primary : t.border}`, background: form.requested_connection_type === type ? (isDark ? 'rgba(59,111,255,0.12)' : '#EEF2FF') : 'transparent', color: form.requested_connection_type === type ? t.primary : t.textSub, fontSize: 13, fontWeight: 500, fontFamily: fonts.ui, cursor: 'pointer', transition: 'all 0.15s' }}>
-                {type}
-              </button>
-            ))}
-          </div>
-        </Field>
-
-        {/* Address */}
-        <Field label="Installation Address">
-          <textarea
-            rows={3}
-            value={form.address}
-            onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
-            placeholder="House number, street, landmark, area..."
-            style={{ ...selectStyle, resize: 'none', lineHeight: 1.5 }}
-          />
-        </Field>
-
-        {/* Priority */}
-        <Field label="Priority">
-          <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))} style={selectStyle}>
-            <option value="Normal">Normal</option>
-            <option value="High">High</option>
-            <option value="Urgent">Urgent</option>
-          </select>
-        </Field>
-
-        {error && (
-          <div style={{ fontSize: 13, color: isDark ? '#F87171' : '#B91C1C', marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: isDark ? '#2D0C0C' : '#FEE2E2' }}>{error}</div>
-        )}
-
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: 10, border: `1.5px solid ${t.border}`, background: 'transparent', color: t.text, fontSize: 14, fontWeight: 500, fontFamily: fonts.ui, cursor: 'pointer' }}>
-            Cancel
-          </button>
-          <button onClick={handleSubmit} disabled={loading} style={{ flex: 2, padding: '12px', borderRadius: 10, border: 'none', background: loading ? t.textMuted : 'linear-gradient(135deg,#3B6FFF,#2952D9)', color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: fonts.ui, cursor: loading ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : '0 4px 16px rgba(59,111,255,0.3)' }}>
-            {loading ? 'Submitting...' : 'Submit Application'}
-          </button>
-        </div>
-      </div>
     </div>
   );
 };
@@ -365,7 +243,7 @@ const ConnectionApplications = () => {
         </div>
       )}
 
-      {showModal && <NewAppModal onClose={() => setShowModal(false)} onSuccess={handleSuccess} t={t} isDark={isDark} />}
+      {showModal && <NewApplicationModal onClose={() => setShowModal(false)} onSuccess={handleSuccess} t={t} isDark={isDark} />}
     </div>
   );
 };

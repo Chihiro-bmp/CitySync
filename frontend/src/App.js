@@ -20,6 +20,7 @@ import UsageHistory      from './components/Consumer/UsageHistory';
 import Complaints              from './components/Consumer/Complaints';
 import ConnectionApplications  from './components/Consumer/ConnectionApplications';
 import MyConnections           from './components/Consumer/Myconnections';
+import ConnectionDetail        from './components/Consumer/ConnectionDetail';
 import Payments                from './components/Consumer/Payments';
 import Profile                 from './components/Profile';
 
@@ -77,6 +78,7 @@ function App() {
                   <Routes>
                     <Route path="dashboard"    element={<ConsumerDashboard />} />
                     <Route path="connections"  element={<MyConnections />} />
+                    <Route path="connections/:id" element={<ConnectionDetail />} />
                     <Route path="bills"      element={<MyBills />} />
                     <Route path="bills/:id"  element={<BillDetail />} />
                     <Route path="usage"      element={<UsageHistory />} />

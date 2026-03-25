@@ -253,7 +253,7 @@ const AIAssistant = ({ role }) => {
               AI Assistant
             </div>
             <div style={{ fontSize: 11, color: t.textSub, fontFamily: fonts.mono }}>
-              {role === 'consumer' ? 'Powered by Claude · Your utility advisor' : 'Powered by Claude · Business insights'}
+              {role === 'consumer' ? 'Powered by Gemini · Your utility advisor' : 'Powered by Gemini · Business insights'}
             </div>
           </div>
           {history.length > 0 && (

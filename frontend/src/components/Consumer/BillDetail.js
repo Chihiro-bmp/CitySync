@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../Layout/ThemeContext';
 import { tokens, fonts, utilities, statusColors } from '../../theme';
 import { ElectricityIcon, WaterIcon, GasIcon, BillIcon } from '../../Icons';
+import PayBillModal from './PayBillModal';
 
 const UtilIcons = { electricity: ElectricityIcon, water: WaterIcon, gas: GasIcon };
 
@@ -14,20 +15,25 @@ const Row = ({ label, value, mono, t }) => (
   </div>
 );
 
-const BillDetail = () => {
-  const { id } = useParams();
+const BillDetail = ({ billId, onClose, onBillPaid }) => {
+  const { id: routeId } = useParams();
   const { authFetch } = useAuth();
   const { isDark } = useTheme();
   const navigate = useNavigate();
   const t = tokens[isDark ? 'dark' : 'light'];
 
+  const resolvedBillId = billId || routeId;
+  const closeDetail = onClose || (() => navigate(-1));
+  const overlayBg = 'rgba(0,0,0,0.55)';
+
   const [bill, setBill]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
+  const [showPayModal, setShowPayModal] = useState(false);
 
   const fetchBill = useCallback(async () => {
     try {
-      const res = await authFetch(`/api/consumer/bills/${id}`);
+      const res = await authFetch(`/api/consumer/bills/${resolvedBillId}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setBill(data);
@@ -36,38 +42,57 @@ const BillDetail = () => {
     } finally {
       setLoading(false);
     }
-  }, [authFetch, id]);
+  }, [authFetch, resolvedBillId]);
 
   useEffect(() => { fetchBill(); }, [fetchBill]);
 
+  const handlePaySuccess = () => {
+    setShowPayModal(false);
+    if (onBillPaid) onBillPaid();
+    closeDetail();
+  };
+
   if (loading) return (
-    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-      {[1,2,3].map(i => <div key={i} style={{ height:80, borderRadius:14, background:t.bgCard, border:`1px solid ${t.border}`, animation:'pulse 1.5s infinite' }} />)}
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}`}</style>
+    <div style={{ position:'fixed', inset:0, background:overlayBg, zIndex:190, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      <div style={{ width:'100%', maxWidth:760, background:t.bgCard, border:`1px solid ${t.border}`, borderRadius:20, padding:20, display:'flex', flexDirection:'column', gap:16 }}>
+        {[1,2,3].map(i => <div key={i} style={{ height:80, borderRadius:14, background:t.bgCard, border:`1px solid ${t.border}`, animation:'pulse 1.5s infinite' }} />)}
+        <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}`}</style>
+      </div>
     </div>
   );
 
   if (error) return (
-    <div style={{ textAlign:'center', padding:'64px 0' }}>
-      <div style={{ fontSize:14, color: isDark ? '#F87171' : '#B91C1C' }}>{error}</div>
-      <button onClick={() => navigate(-1)} style={{ marginTop:16, padding:'9px 20px', borderRadius:9, border:`1px solid ${t.border}`, background:'transparent', color:t.text, cursor:'pointer', fontFamily:fonts.ui }}>Go Back</button>
+    <div style={{ position:'fixed', inset:0, background:overlayBg, zIndex:190, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      <div style={{ width:'100%', maxWidth:560, background:t.bgCard, border:`1px solid ${t.border}`, borderRadius:20, padding:'28px 22px', textAlign:'center' }}>
+        <div style={{ fontSize:14, color: isDark ? '#F87171' : '#B91C1C' }}>{error}</div>
+        <button onClick={closeDetail} style={{ marginTop:16, padding:'9px 20px', borderRadius:9, border:`1px solid ${t.border}`, background:'transparent', color:t.text, cursor:'pointer', fontFamily:fonts.ui }}>Close</button>
+      </div>
     </div>
   );
 
   const util   = utilities[bill.utility_tag] || utilities.payment;
   const Icon   = UtilIcons[bill.utility_tag] || BillIcon;
-  const status = statusColors[bill.status] || statusColors['Pending'];
   const isPayable = ['Pending', 'Overdue'].includes(bill.status);
+  const isPostpaid = (bill?.bill_type || '').toLowerCase() === 'postpaid';
+  const status = statusColors[bill.status] || statusColors['Pending'];
 
   const fmt = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' }) : '—';
 
   return (
-    <div style={{ fontFamily:fonts.ui, maxWidth:680, margin:'0 auto' }}>
+    <div
+      style={{ position:'fixed', inset:0, background:overlayBg, zIndex:190, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
+      onClick={closeDetail}
+    >
+      <div
+        style={{ fontFamily:fonts.ui, width:'100%', maxWidth:760, maxHeight:'92vh', overflowY:'auto', background:t.bgCard, border:`1px solid ${t.border}`, borderRadius:20, padding:20 }}
+        onClick={(e) => e.stopPropagation()}
+      >
 
-      {/* Back */}
-      <button onClick={() => navigate(-1)} style={{ display:'flex', alignItems:'center', gap:6, background:'none', border:'none', cursor:'pointer', color:t.textSub, fontSize:13, fontFamily:fonts.ui, marginBottom:20, padding:0 }}>
-        ← Back to Bills
-      </button>
+      {/* Header */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+        <div style={{ fontSize:14, fontWeight:600, color:t.text }}>Bill Details</div>
+        <button onClick={closeDetail} style={{ background:'none', border:'none', cursor:'pointer', color:t.textMuted, fontSize:24, lineHeight:1, padding:0 }}>×</button>
+      </div>
 
       {/* Hero card */}
       <div style={{ borderRadius:20, overflow:'hidden', marginBottom:20, border:`1px solid ${t.border}` }}>
@@ -84,30 +109,46 @@ const BillDetail = () => {
                 <div style={{ fontSize:12, color:'rgba(255,255,255,0.65)', fontFamily:fonts.mono }}>{bill.period}</div>
               </div>
             </div>
-            <span style={{ fontSize:12, fontWeight:500, padding:'4px 12px', borderRadius:100, background:'rgba(255,255,255,0.2)', color:'#fff', backdropFilter:'blur(4px)' }}>
+            <span style={{
+              fontSize:12,
+              fontWeight:500,
+              padding:'4px 12px',
+              borderRadius:100,
+              background: isDark ? status.db : status.lb,
+              color: isDark ? status.dc : status.lc,
+              border: `1px solid ${isDark ? status.dc + '22' : status.lc + '22'}`,
+              backdropFilter:'blur(4px)'
+            }}>
               {bill.status}
             </span>
           </div>
 
           <div style={{ marginTop:24, position:'relative' }}>
             <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', fontFamily:fonts.mono, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:4 }}>Total Amount</div>
-            <div style={{ fontSize:40, fontWeight:700, color:'#fff', letterSpacing:'-1px', fontFamily:fonts.ui }}>৳ {parseFloat(bill.total_amount).toLocaleString()}</div>
+            <div style={{ fontSize:40, fontWeight:700, color:'#fff', letterSpacing:'-1px', fontFamily:fonts.ui }}>৳ {parseFloat(bill.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </div>
         </div>
 
         {/* Quick stats row */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', background:t.bgCard }}>
-          {[
-            { label:'Units Used',     val:`${bill.unit_consumed}`, sub: bill.unit_of_measurement || 'units' },
-            { label:'Energy Charge',  val:`৳ ${parseFloat(bill.energy_amount||0).toLocaleString()}`, sub:'Excl. taxes' },
-            { label:'Due Date',       val: bill.due_date ? new Date(bill.due_date).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—', sub:'Payment deadline' },
-          ].map((s,i) => (
-            <div key={s.label} style={{ padding:'16px 20px', borderRight: i < 2 ? `1px solid ${t.border}` : 'none', borderTop:`1px solid ${t.border}` }}>
-              <div style={{ fontSize:10, color:t.textMuted, fontFamily:fonts.mono, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:4 }}>{s.label}</div>
-              <div style={{ fontSize:16, fontWeight:600, color:t.text, fontFamily:fonts.ui, marginBottom:2 }}>{s.val}</div>
-              <div style={{ fontSize:11, color:t.textMuted }}>{s.sub}</div>
-            </div>
-          ))}
+          {(() => {
+            const dateLabel = isPayable ? 'Due' : 'Paid';
+            const dateVal = isPayable ? bill.due_date : bill.payment_date;
+            const dateDisplay = dateVal ? new Date(dateVal).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+            const items = [
+              { label:'Units Used',     val:`${bill.unit_consumed}`, sub: bill.unit_of_measurement || 'units' },
+              { label:'Energy Charge',  val:`৳ ${parseFloat(bill.energy_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, sub:'Excl. taxes' },
+              { label: dateLabel, val: dateDisplay },
+            ];
+  
+            return items.map((s, i) => (
+              <div key={s.label} style={{ padding:'16px 20px', borderRight: i < 2 ? `1px solid ${t.border}` : 'none', borderTop:`1px solid ${t.border}` }}>
+                <div style={{ fontSize:10, color:t.textMuted, fontFamily:fonts.mono, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:4 }}>{s.label}</div>
+                <div style={{ fontSize:16, fontWeight:600, color:t.text, fontFamily:fonts.ui, marginBottom:2 }}>{s.val}</div>
+                <div style={{ fontSize:11, color:t.textMuted }}>{s.sub}</div>
+              </div>
+            ));
+          })()}
         </div>
       </div>
 
@@ -117,22 +158,35 @@ const BillDetail = () => {
         <Row label="Bill ID"         value={`#${bill.bill_document_id}`}                                         mono t={t} />
         <Row label="Bill Type"       value={bill.bill_type}                                                       t={t} />
         <Row label="Tariff Plan"     value={bill.tariff_name}                                                     t={t} />
-        <Row label="Billing Method"  value={bill.billing_method}                                                  t={t} />
-        <Row label="Period"          value={`${fmt(bill.bill_period_start)} — ${fmt(bill.bill_period_end)}`}      t={t} />
-        <Row label="Generated On"    value={fmt(bill.bill_generation_date)}                                       t={t} />
-        {bill.remarks && <Row label="Remarks" value={bill.remarks} t={t} />}
+        {/* <Row label="Billing Method"  value={bill.billing_method}                                                  t={t} /> */}
+        {isPostpaid && <Row label="Period"          value={`${fmt(bill.bill_period_start)} — ${fmt(bill.bill_period_end)}`}      t={t} />}
+        <Row label="Issue Date"    value={fmt(bill.bill_generation_date)}                                       t={t} />
+        <Row label="Address"       value={bill.address}                                                         t={t} />
+        {bill.fixed_charges && bill.fixed_charges.length > 0 && (
+          bill.fixed_charges.map((fc, i) => (
+            <Row
+              key={i}
+              label={fc.charge_name + (fc.period ? ' - ' + fc.period : '')}
+              value={`৳ ${parseFloat(fc.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              t={t}
+            />
+          ))
+        )}
+        <Row label="Energy cost" value={`৳ ${parseFloat(bill.energy_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} t={t} />
+        <Row label="Gross amount" value={`৳ ${parseFloat(bill.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} t={t} />
+        {isPostpaid && bill.remarks && <Row label="Remarks" value={bill.remarks} t={t} />}
       </div>
 
       {/* Pay button (if payable) */}
       {isPayable && (
-        <button onClick={() => navigate('/consumer/bills', { state: { payBillId: bill.bill_document_id } })} style={{
+        <button onClick={() => setShowPayModal(true)} style={{
           width:'100%', padding:'14px', borderRadius:12, border:'none',
           background:'linear-gradient(135deg,#3B6FFF,#2952D9)',
           color:'#fff', fontSize:15, fontWeight:600, fontFamily:fonts.ui,
           cursor:'pointer', boxShadow:'0 4px 18px rgba(59,111,255,0.35)',
           letterSpacing:'-0.1px',
         }}>
-          Pay ৳ {parseFloat(bill.total_amount).toLocaleString()} Now
+          Pay Now
         </button>
       )}
       {bill.status === 'Paid' && (
@@ -140,6 +194,17 @@ const BillDetail = () => {
           ✓ This bill has been paid
         </div>
       )}
+
+        {showPayModal && bill && (
+          <PayBillModal
+            bill={{ ...bill, amount: bill.total_amount }}
+            onClose={() => setShowPayModal(false)}
+            onSuccess={handlePaySuccess}
+            t={t}
+            isDark={isDark}
+          />
+        )}
+      </div>
     </div>
   );
 };

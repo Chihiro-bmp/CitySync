@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../Layout/ThemeContext';
-import { tokens, fonts } from '../../theme';
+import { tokens, fonts, paymentMethods } from '../../theme';
+import BillDetail from './BillDetail';
+import AddMethodModal from './AddMethodModal';
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const BankIcon    = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 22V12h6v10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>;
@@ -110,153 +112,38 @@ const MethodCard = ({ method, onDelete, onSetDefault, t, isDark }) => {
   );
 };
 
-// ── Add Method Modal ──────────────────────────────────────────────────────────
-const AddMethodModal = ({ onClose, onAdded, t, isDark, authFetch }) => {
-  const [type, setType]         = useState('mobile_banking');
-  const [form, setForm]         = useState({});
-  const [setDefault, setDef]    = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState('');
-  const [done, setDone]         = useState(false);
+// AddMethodModal extracted to ./AddMethodModal
 
-  const handleAdd = async () => {
-    setLoading(true); setError('');
-    try {
-      const body = { method_name: type, set_default: setDefault, ...form };
-      const res  = await authFetch('/api/consumer/payment-methods', { method: 'POST', body: JSON.stringify(body) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setDone(true);
-      setTimeout(() => { onAdded(); onClose(); }, 1500);
-    } catch (err) { setError(err.message); }
-    finally       { setLoading(false); }
-  };
-
-  const inputStyle = { width: '100%', padding: '10px 13px', borderRadius: 10, border: `1.5px solid ${t.border}`, background: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFF', color: t.text, fontSize: 13, fontFamily: fonts.ui, outline: 'none', boxSizing: 'border-box' };
-  const cfg = METHOD_TYPES[type];
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
-      <div style={{ background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: 20, padding: 28, width: '100%', maxWidth: 440 }} onClick={e => e.stopPropagation()}>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, color: t.text }}>Add Payment Method</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.textMuted, fontSize: 22 }}>×</button>
-        </div>
-
-        {done ? (
-          <div style={{ textAlign: 'center', padding: '24px 0' }}>
-            <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', color: '#16A34A' }}><CheckIcon /></div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: t.text }}>Method added!</div>
-          </div>
-        ) : (
-          <>
-            {/* Type selector */}
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 12, fontWeight: 500, color: t.textSub, display: 'block', marginBottom: 10 }}>Method Type</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                {Object.entries(METHOD_TYPES).map(([key, c]) => {
-                  const I = c.icon;
-                  const active = type === key;
-                  return (
-                    <button key={key} onClick={() => { setType(key); setForm({}); }}
-                      style={{ padding: '12px 8px', borderRadius: 12, border: `1.5px solid ${active ? 'transparent' : t.border}`, background: active ? c.grad : 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, transition: 'all 0.15s', boxShadow: active ? `0 4px 14px ${c.glow}` : 'none' }}>
-                      <span style={{ color: active ? '#fff' : t.textSub }}><I /></span>
-                      <span style={{ fontSize: 11, fontWeight: 500, color: active ? '#fff' : t.textSub, textAlign: 'center', lineHeight: 1.3 }}>{c.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Dynamic fields */}
-            {type === 'bank' && (
-              <>
-                <div style={{ marginBottom: 14 }}>
-                  <label style={{ fontSize: 12, fontWeight: 500, color: t.textSub, display: 'block', marginBottom: 7 }}>Bank Name</label>
-                  <select value={form.bank_name || ''} onChange={e => setForm(f => ({ ...f, bank_name: e.target.value }))}
-                    style={{ ...inputStyle, cursor: 'pointer' }}>
-                    <option value="">Select bank...</option>
-                    {METHOD_TYPES.bank.providers.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-                <div style={{ marginBottom: 20 }}>
-                  <label style={{ fontSize: 12, fontWeight: 500, color: t.textSub, display: 'block', marginBottom: 7 }}>Account Number</label>
-                  <input value={form.account_num || ''} onChange={e => setForm(f => ({ ...f, account_num: e.target.value }))}
-                    placeholder="e.g. 12345678901234" style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = t.primary} onBlur={e => e.target.style.borderColor = t.border} />
-                </div>
-              </>
-            )}
-
-            {type === 'mobile_banking' && (
-              <>
-                <div style={{ marginBottom: 14 }}>
-                  <label style={{ fontSize: 12, fontWeight: 500, color: t.textSub, display: 'block', marginBottom: 7 }}>Provider</label>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {METHOD_TYPES.mobile_banking.providers.map(p => (
-                      <button key={p} onClick={() => setForm(f => ({ ...f, provider_name: p }))}
-                        style={{ padding: '7px 14px', borderRadius: 100, border: `1.5px solid ${form.provider_name === p ? t.primary : t.border}`, background: form.provider_name === p ? (isDark ? 'rgba(59,111,255,0.12)' : '#EEF2FF') : 'transparent', color: form.provider_name === p ? t.primary : t.textSub, fontSize: 12, fontWeight: 500, fontFamily: fonts.ui, cursor: 'pointer', transition: 'all 0.15s' }}>
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div style={{ marginBottom: 20 }}>
-                  <label style={{ fontSize: 12, fontWeight: 500, color: t.textSub, display: 'block', marginBottom: 7 }}>Phone Number</label>
-                  <input value={form.phone_num || ''} onChange={e => setForm(f => ({ ...f, phone_num: e.target.value }))}
-                    placeholder="01XXXXXXXXX" style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = t.primary} onBlur={e => e.target.style.borderColor = t.border} />
-                </div>
-              </>
-            )}
-
-            {type === 'google_pay' && (
-              <>
-                <div style={{ marginBottom: 14 }}>
-                  <label style={{ fontSize: 12, fontWeight: 500, color: t.textSub, display: 'block', marginBottom: 7 }}>Google Account Email</label>
-                  <input type="email" value={form.google_account_email || ''} onChange={e => setForm(f => ({ ...f, google_account_email: e.target.value }))}
-                    placeholder="you@gmail.com" style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = t.primary} onBlur={e => e.target.style.borderColor = t.border} />
-                </div>
-                <div style={{ marginBottom: 20 }}>
-                  <label style={{ fontSize: 12, fontWeight: 500, color: t.textSub, display: 'block', marginBottom: 7 }}>Phone Number <span style={{ color: t.textMuted }}>(optional)</span></label>
-                  <input value={form.phone_num || ''} onChange={e => setForm(f => ({ ...f, phone_num: e.target.value }))}
-                    placeholder="01XXXXXXXXX" style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = t.primary} onBlur={e => e.target.style.borderColor = t.border} />
-                </div>
-              </>
-            )}
-
-            {/* Set as default */}
-            <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, cursor: 'pointer' }}>
-              <input type="checkbox" checked={setDefault} onChange={e => setDef(e.target.checked)} style={{ accentColor: t.primary, width: 15, height: 15 }} />
-              <span style={{ fontSize: 13, color: t.textSub }}>Set as default payment method</span>
-            </label>
-
-            {error && <div style={{ fontSize: 13, color: isDark ? '#F87171' : '#B91C1C', padding: '10px 14px', borderRadius: 8, background: isDark ? '#2D0C0C' : '#FEE2E2', marginBottom: 16 }}>{error}</div>}
-
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={onClose} style={{ flex: 1, padding: 12, borderRadius: 10, border: `1.5px solid ${t.border}`, background: 'transparent', color: t.text, fontSize: 13, fontWeight: 500, fontFamily: fonts.ui, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleAdd} disabled={loading}
-                style={{ flex: 2, padding: 12, borderRadius: 10, border: 'none', background: loading ? t.textMuted : cfg.grad, color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: fonts.ui, cursor: loading ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : `0 4px 14px ${cfg.glow}` }}>
-                {loading ? 'Adding...' : 'Add Method'}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
 
 // ── Payment History Row ───────────────────────────────────────────────────────
-const HistoryRow = ({ p, t, isDark }) => {
+const HistoryRow = ({ p, t, onOpenBill }) => {
   const cfg  = METHOD_TYPES[p.method_name] || METHOD_TYPES.bank;
   const Icon = cfg.icon;
+
+  const grad = (paymentMethods[p.method_name] && paymentMethods[p.method_name].grad) || paymentMethods.bank.grad;
+  const glow = (paymentMethods[p.method_name] && paymentMethods[p.method_name].glow) || paymentMethods.bank.glow;
+
+  const billId = p.bill_document_id;
+  const isClickable = Boolean(billId);
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 0', borderBottom: `1px solid ${t.border}` }}>
-      <div style={{ width: 34, height: 34, borderRadius: 10, background: cfg.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 2px 8px ${cfg.glow}`, flexShrink: 0, color: '#fff' }}>
+    <button
+      onClick={() => isClickable && onOpenBill(billId)}
+      disabled={!isClickable}
+      style={{
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '13px 0',
+        border: 'none',
+        borderBottom: `1px solid ${t.border}`,
+        background: 'transparent',
+        textAlign: 'left',
+        cursor: isClickable ? 'pointer' : 'default',
+      }}
+    >
+      <div style={{ width: 34, height: 34, borderRadius: 10, background: grad, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 2px 8px ${glow}`, flexShrink: 0, color: '#fff' }}>
         <Icon />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -267,9 +154,10 @@ const HistoryRow = ({ p, t, isDark }) => {
         <div style={{ fontSize: 14, fontWeight: 600, color: t.text }}>৳ {parseFloat(p.payment_amount).toLocaleString()}</div>
         <div style={{ fontSize: 11, color: t.textMuted, fontFamily: fonts.mono }}>{new Date(p.payment_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
       </div>
-    </div>
+    </button>
   );
 };
+
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 const Payments = () => {
@@ -283,6 +171,7 @@ const Payments = () => {
   const [showAdd, setShowAdd]   = useState(false);
   const [tab, setTab]           = useState('methods'); // 'methods' | 'history'
   const [toast, setToast]       = useState('');
+  const [detailBillId, setDetailBillId] = useState(null);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
@@ -318,6 +207,10 @@ const Payments = () => {
       setMethods(m => m.map(x => ({ ...x, is_default: x.method_id === id })));
       showToast('Default method updated');
     } catch { showToast('Failed to update default'); }
+  };
+
+  const handleOpenBill = (billId) => {
+    setDetailBillId(billId);
   };
 
   const totalSpent = history.reduce((s, p) => s + parseFloat(p.payment_amount || 0), 0);
@@ -399,12 +292,13 @@ const Payments = () => {
           <div style={{ textAlign: 'center', padding: '52px 0', color: t.textMuted, fontSize: 13 }}>No payment history yet</div>
         ) : (
           <div style={{ background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: 16, padding: '4px 20px' }}>
-            {history.map((p, i) => <HistoryRow key={i} p={p} t={t} isDark={isDark} />)}
+            {history.map((p, i) => <HistoryRow key={i} p={p} t={t} onOpenBill={handleOpenBill} />)}
           </div>
         )
       )}
 
       {showAdd && <AddMethodModal onClose={() => setShowAdd(false)} onAdded={fetchAll} t={t} isDark={isDark} authFetch={authFetch} />}
+      {detailBillId && <BillDetail billId={detailBillId} onClose={() => setDetailBillId(null)} />}
     </div>
   );
 };

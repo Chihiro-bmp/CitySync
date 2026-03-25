@@ -29,7 +29,7 @@ router.get('/connections', async (req, res) => {
         uc.connection_type,
         u.utility_name,
         u.unit_of_measurement,
-        LOWER(u.utility_name)   AS utility_tag,
+        LOWER(u.utility_type)   AS utility_tag,
         t.tariff_name,
         t.billing_method,
         a.house_num,
@@ -58,6 +58,67 @@ router.get('/connections', async (req, res) => {
   }
 });
 
+// ── GET /api/consumer/connections/:id ─────────────────────────────────────────
+router.get('/connections/:id', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        uc.connection_id,
+        uc.connection_status,
+        uc.connection_date,
+        uc.payment_type,
+        uc.connection_type,
+        uc.load_requirement,
+        u.utility_name,
+        u.utility_type,
+        u.unit_of_measurement,
+        LOWER(u.utility_type)   AS utility_tag,
+        t.tariff_name,
+        t.billing_method,
+        m.meter_id,
+        m.meter_type,
+        m.is_active            AS meter_active,
+        a.house_num,
+        a.street_name,
+        r.region_name,
+        pa.prepaid_account_id,
+        pa.balance             AS prepaid_balance,
+        eu.voltage_level       AS electricity_voltage_level,
+        eu.phase_type         AS electricity_phase_type,
+        wu.pressure_level      AS water_pressure_level,
+        wu.water_source,
+        wu.quality_grade       AS water_quality_grade,
+        gu.gas_type,
+        gu.pressure_category  AS gas_pressure_category,
+        COALESCE((
+          SELECT SUM(us.unit_used)
+          FROM usage us
+          WHERE us.meter_id = uc.meter_id
+            AND us.time_to >= DATE_TRUNC('month', CURRENT_DATE)
+        ), 0) AS units_used
+      FROM utility_connection uc
+      JOIN tariff  t  ON uc.tariff_id  = t.tariff_id
+      JOIN utility u  ON t.utility_id  = u.utility_id
+      JOIN meter   m  ON uc.meter_id   = m.meter_id
+      JOIN address a  ON m.address_id  = a.address_id
+      JOIN region  r  ON a.region_id   = r.region_id
+      LEFT JOIN prepaid_account pa ON uc.connection_id = pa.connection_id
+      LEFT JOIN electricity_utility eu ON u.utility_id = eu.utility_id
+      LEFT JOIN water_utility wu ON u.utility_id = wu.utility_id
+      LEFT JOIN gas_utility gu ON u.utility_id = gu.utility_id
+      WHERE uc.connection_id = $1 AND uc.consumer_id = $2
+    `, [req.params.id, req.user.userId]);
+
+    if (result.rows.length === 0)
+      return res.status(404).json({ error: 'Connection not found' });
+    
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch connection details' });
+  }
+});
+
 // ── GET /api/consumer/bills ───────────────────────────────────────────────────
 router.get('/bills', async (req, res) => {
   const limit = parseInt(req.query.limit) || 20;
@@ -77,7 +138,7 @@ router.get('/bills', async (req, res) => {
         bp.remarks,
         u.utility_name,
         u.unit_of_measurement,
-        LOWER(u.utility_name)                  AS utility_tag,
+        LOWER(u.utility_type)                  AS utility_tag,
         TO_CHAR(bp.bill_period_start, 'Mon YYYY') AS period,
         uc.connection_id
       FROM bill_document bd
@@ -115,7 +176,7 @@ router.get('/bills/:id', async (req, res) => {
         bp.remarks,
         u.utility_name,
         u.unit_of_measurement,
-        LOWER(u.utility_name)                  AS utility_tag,
+        LOWER(u.utility_type)                  AS utility_tag,
         TO_CHAR(bp.bill_period_start, 'Mon YYYY') AS period,
         t.tariff_name,
         t.billing_method,
@@ -155,7 +216,7 @@ router.get('/usage', async (req, res) => {
         ROUND(us.unit_used * ts.rate_per_unit, 2) AS cost,
         u.utility_name,
         u.unit_of_measurement,
-        LOWER(u.utility_name)               AS utility_tag
+        LOWER(u.utility_type)               AS utility_tag
       FROM usage us
       JOIN utility_connection uc ON us.meter_id  = uc.meter_id
       JOIN tariff  t              ON uc.tariff_id = t.tariff_id
@@ -188,7 +249,7 @@ router.get('/complaints', async (req, res) => {
         c.remarks,
         c.connection_id,
         u.utility_name,
-        LOWER(u.utility_name) AS utility_tag
+        LOWER(u.utility_type) AS utility_tag
       FROM complaint c
       LEFT JOIN utility_connection uc ON c.connection_id = uc.connection_id
       LEFT JOIN tariff  t              ON uc.tariff_id   = t.tariff_id
