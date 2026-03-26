@@ -200,10 +200,15 @@ async function callGemini(systemPrompt, history, question) {
   });
 
   // Convert history to Gemini format: { role: 'user'|'model', parts: [{ text }] }
-  const geminiHistory = history.map(h => ({
+  let geminiHistory = history.map(h => ({
     role:  h.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: h.content }],
   }));
+
+  // Gemini API requires the first message to be from a 'user'
+  while (geminiHistory.length > 0 && geminiHistory[0].role === 'model') {
+    geminiHistory.shift();
+  }
 
   const chat = model.startChat({ history: geminiHistory });
   const result = await chat.sendMessage(question);

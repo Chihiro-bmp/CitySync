@@ -1,19 +1,12 @@
-import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useTheme } from './ThemeContext';
-import { tokens, navItems, fonts } from '../../theme';
-import { NavIcons, LogoutIcon, ChevronIcon } from '../../Icons';
-
-const SIDEBAR_WIDTH = 240;
-const SIDEBAR_COLLAPSED = 68;
+import { navItems } from '../../theme';
 
 const Sidebar = ({ collapsed, onToggle }) => {
   const { user, logout } = useAuth();
-  const { isDark } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
-  const t = tokens[isDark ? 'dark' : 'light'];
 
   const items = navItems[user?.role] || [];
 
@@ -24,175 +17,85 @@ const Sidebar = ({ collapsed, onToggle }) => {
 
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
 
-  const width = collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH;
-
   return (
-    <div style={{
-      width,
-      minHeight: '100vh',
-      background: t.sidebar,
-      display: 'flex',
-      flexDirection: 'column',
-      position: 'fixed',
-      left: 0,
-      top: 0,
-      bottom: 0,
-      zIndex: 50,
-      transition: 'width 0.25s ease',
-      borderRight: `1px solid rgba(255,255,255,0.04)`,
-      overflow: 'hidden',
-    }}>
-
-      {/* ── Logo ── */}
-      <div style={{
-        padding: collapsed ? '20px 0' : '20px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        justifyContent: collapsed ? 'center' : 'flex-start',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
-        minHeight: 68,
-      }}>
-        {/* Logo mark */}
-        <div style={{
-          width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-          background: 'linear-gradient(135deg,#3B6FFF,#00C4FF)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 12px rgba(59,111,255,0.35)',
-          cursor: 'pointer',
-        }} onClick={onToggle}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path d="M3 9L12 3L21 9V20C21 20.55 20.55 21 20 21H15V15H9V21H4C3.45 21 3 20.55 3 20V9Z" fill="#fff"/>
-          </svg>
+    <aside 
+        className={`fixed left-0 top-0 bottom-0 z-50 bg-bg border-r border-white/5 transition-all duration-500 ease-in-out flex flex-col font-outfit overflow-hidden ${collapsed ? 'w-20' : 'w-64'}`}
+    >
+      {/* Logo Section */}
+      <div className={`h-24 flex items-center border-b border-white/5 px-6 shrink-0 ${collapsed ? 'justify-center' : 'justify-start gap-4'}`}>
+        <div 
+            onClick={onToggle}
+            className="w-10 h-10 rounded-2xl bg-lime flex items-center justify-center cursor-pointer shadow-lg shadow-lime/10 transition-transform active:scale-90 shrink-0"
+        >
+          <span className="text-bg text-xl font-bold">C</span>
         </div>
-
-        {/* Wordmark — hidden when collapsed */}
         {!collapsed && (
-          <div style={{ overflow: 'hidden' }}>
-            <div style={{ fontFamily: fonts.display, fontSize: 17, fontWeight: 700, color: '#fff', letterSpacing: '-0.2px', whiteSpace: 'nowrap' }}>
-              CitySync
-            </div>
-            <div style={{ fontFamily: fonts.mono, fontSize: 9, color: '#334466', letterSpacing: '0.1em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-              {user?.role?.replace('_', ' ')}
-            </div>
+          <div className="animate-fade-in flex flex-col">
+            <span className="font-barlow text-xl font-bold tracking-tight text-txt leading-none">City<span className="text-lime">Sync</span></span>
+            <span className="text-[9px] font-mono text-txt/30 uppercase tracking-widest mt-1">{user?.role?.replace('_', ' ')}</span>
           </div>
         )}
       </div>
 
-      {/* ── Nav items ── */}
-      <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto', overflowX: 'hidden' }}>
+      {/* Navigation Items */}
+      <nav className="flex-1 py-8 px-4 space-y-2 overflow-y-auto no-scrollbar">
         {items.map((item) => {
           const active = isActive(item.path);
-          const IconComp = NavIcons[item.icon];
-
           return (
             <button
               key={item.path}
               onClick={() => navigate(item.path)}
-              title={collapsed ? item.label : undefined}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                padding: collapsed ? '11px 0' : '11px 14px',
-                justifyContent: collapsed ? 'center' : 'flex-start',
-                borderRadius: 10,
-                border: 'none',
-                cursor: 'pointer',
-                marginBottom: 2,
-                background: active
-                  ? `linear-gradient(135deg, rgba(59,111,255,0.18), rgba(0,196,255,0.08))`
-                  : 'transparent',
-                transition: 'background 0.15s',
-                position: 'relative',
-              }}
-              onMouseEnter={e => { if (!active) e.currentTarget.style.background = isDark ? '#0D1425' : '#151C30'; }}
-              onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+              className={`w-full flex items-center gap-4 p-3.5 rounded-2xl transition-all duration-300 relative group ${
+                active 
+                  ? 'bg-white/5 text-lime' 
+                  : 'text-txt/40 hover:bg-white/[0.02] hover:text-txt/80'
+              } ${collapsed ? 'justify-center' : ''}`}
             >
-              {/* Active indicator bar */}
               {active && (
-                <div style={{
-                  position: 'absolute', left: 0, top: '20%', bottom: '20%',
-                  width: 3, borderRadius: '0 3px 3px 0',
-                  background: 'linear-gradient(180deg,#3B6FFF,#00C4FF)',
-                }} />
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-lime rounded-r-full" />
               )}
-
-              {IconComp && (
-                <IconComp
-                  size={18}
-                  color={active ? '#4D7DFF' : '#4A5C78'}
-                />
-              )}
+              
+              <div className={`transition-transform duration-300 ${active ? 'scale-110' : 'group-hover:scale-110 text-txt/20'}`}>
+                {/* Fallback icon if none provided by comp */}
+                <div className="w-5 h-5 border border-current rounded-md opacity-40"></div>
+              </div>
 
               {!collapsed && (
-                <span style={{
-                  fontFamily: fonts.ui,
-                  fontSize: 14,
-                  fontWeight: active ? 600 : 400,
-                  color: active ? '#fff' : '#4A5C78',
-                  whiteSpace: 'nowrap',
-                  transition: 'color 0.15s',
-                }}>
-                  {item.label}
+                <span className={`text-[13.5px] font-bold tracking-tight animate-fade-in ${active ? 'text-txt' : ''}`}>
+                    {item.label}
                 </span>
+              )}
+
+              {collapsed && !active && (
+                  <div className="absolute left-full ml-4 px-3 py-2 bg-bg border border-white/10 rounded-xl text-[10px] uppercase font-mono tracking-widest text-lime opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-2xl">
+                      {item.label}
+                  </div>
               )}
             </button>
           );
         })}
       </nav>
 
-      {/* ── User + Logout ── */}
-      <div style={{
-        padding: '12px 8px',
-        borderTop: '1px solid rgba(255,255,255,0.05)',
-      }}>
-        {/* User info */}
+      {/* User & Logout Section */}
+      <div className="p-4 border-t border-white/5 shrink-0 bg-white/[0.01]">
         {!collapsed && user && (
-          <div style={{
-            padding: '10px 14px',
-            borderRadius: 10,
-            background: 'rgba(255,255,255,0.03)',
-            marginBottom: 8,
-          }}>
-            <div style={{ fontFamily: fonts.ui, fontSize: 13, fontWeight: 600, color: '#8A9BBF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {user.firstName} {user.lastName}
+            <div className="px-4 py-4 rounded-3xl bg-white/[0.02] border border-white/5 mb-4 animate-fade-in">
+                <p className="text-xs font-bold text-txt mb-0.5 truncate">{user.firstName} {user.lastName}</p>
+                <p className="text-[10px] font-mono text-txt/20 uppercase tracking-widest">{user.role}</p>
             </div>
-            <div style={{ fontFamily: fonts.mono, fontSize: 10, color: '#334466', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              {user.role?.replace('_', ' ')}
-            </div>
-          </div>
         )}
-
-        {/* Logout */}
+        
         <button
           onClick={handleLogout}
-          title={collapsed ? 'Logout' : undefined}
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            padding: collapsed ? '11px 0' : '11px 14px',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            borderRadius: 10,
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          className={`w-full flex items-center gap-4 p-3.5 rounded-2xl text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-all group ${collapsed ? 'justify-center' : ''}`}
         >
-          <LogoutIcon size={18} color="#4A5C78" />
-          {!collapsed && (
-            <span style={{ fontFamily: fonts.ui, fontSize: 14, fontWeight: 400, color: '#4A5C78' }}>
-              Logout
-            </span>
-          )}
+          <div className="w-5 h-5 transition-transform group-hover:scale-110">
+             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+          </div>
+          {!collapsed && <span className="text-[13.5px] font-bold tracking-tight">Sign Out</span>}
         </button>
       </div>
-    </div>
+    </aside>
   );
 };
 

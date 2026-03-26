@@ -1,9 +1,195 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { fonts } from '../theme';
 
+// ─── DESIGN TOKENS (permanent dark) ──────────────────────────────────────────
+const D = {
+  bg:       '#151515',
+  card:     '#151515',
+  border:   'rgba(255,255,255,0.05)',
+  borderHi: 'rgba(255,255,255,0.10)',
+  grid:     'rgba(255,255,255,0.02)',
+  track:    'rgba(255,255,255,0.04)',
+  txt:      '#E8E8E8',
+  sub:      'rgba(232,232,232,0.40)',
+  muted:    'rgba(232,232,232,0.20)',
+  tooltip:  'rgba(16,16,16,0.94)',
+};
+
+// ─── COUNT-UP ─────────────────────────────────────────────────────────────────
+// Animates a number from 0 to `target` on mount.
+// Props: target (number), decimals (int=0), duration (ms=1400), suffix (string=''), color (css string)
+export const CountUp = ({ target, decimals = 0, duration = 1400, suffix = '', color, style = {} }) => {
+  const [val, setVal] = useState(0);
+  const raf = useRef(null);
+
+  useEffect(() => {
+    const start = performance.now();
+    const tick = (now) => {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setVal(eased * target);
+      if (progress < 1) raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf.current);
+  }, [target, duration]);
+
+  return (
+    <span style={{ color, ...style }}>
+      {val.toFixed(decimals)}{suffix}
+    </span>
+  );
+};
+
+// ─── ARC PROGRESS ─────────────────────────────────────────────────────────────
+// A thin single-arc gauge. Shows current value vs previous value as a % arc.
+// Props:
+//   current   — number (this period's value)
+//   previous  — number (last period's value, used as 100% baseline)
+//   color     — accent color string
+//   label     — string shown below the arc
+//   unit      — string (e.g. 'kWh', 'm³')
+//   size      — px (default 160)
+//   thickness — px (default 10)
+//   animated  — bool (default true)
+//   t         — theme tokens (optional, falls back to D)
+export const ArcProgress = ({
+  current, previous, color, label, unit = '', size = 160, thickness = 10, animated = true, t,
+}) => {
+  const [progress, setProgress] = useState(0);
+  const raf = useRef(null);
+  const duration = 1200;
+
+  // Ratio: current vs previous. Cap at 150% visually.
+  const ratio   = previous > 0 ? Math.min(current / previous, 1.5) : (current > 0 ? 1 : 0);
+  const pct     = Math.round((current / (previous || current || 1)) * 100);
+  const delta   = previous > 0 ? pct - 100 : null;
+
+  // Arc geometry — 240° sweep (from 150° to 390°, i.e. bottom-left to bottom-right)
+  const sweep   = 240;
+  const startDeg = 150;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r  = (size - thickness * 2 - 8) / 2;
+  const circum = 2 * Math.PI * r;
+
+  const degToRad = (d) => (d * Math.PI) / 180;
+  const arcPoint = (deg) => ({
+    x: cx + r * Math.cos(degToRad(deg)),
+    y: cy + r * Math.sin(degToRad(deg)),
+  });
+
+  // Build arc path from startDeg sweeping `sweepAngle` degrees
+  const arcPath = (sweepAngle) => {
+    if (sweepAngle <= 0) return '';
+    const clamp = Math.min(sweepAngle, 359.99);
+    const s = arcPoint(startDeg);
+    const e = arcPoint(startDeg + clamp);
+    const large = clamp > 180 ? 1 : 0;
+    return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`;
+  };
+
+  // Track path (full 240°)
+  const trackPath = arcPath(sweep);
+
+  // Delta color
+  const deltaColor = delta === null ? color
+    : delta <= 0  ? '#44ff99'
+    : delta <= 15 ? '#FF9900'
+    : '#FF5757';
+
+  useEffect(() => {
+    if (!animated) { setProgress(ratio); return; }
+    const start = performance.now();
+    const tick = (now) => {
+      const p = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setProgress(eased * ratio);
+      if (p < 1) raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf.current);
+  }, [ratio, animated]);
+
+  const fillAngle = progress * sweep;
+  const fillPath  = arcPath(fillAngle);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+      <div style={{ position: 'relative', width: size, height: size }}>
+        <svg width={size} height={size} style={{ overflow: 'visible' }}>
+          {/* Track */}
+          <path d={trackPath} fill="none" stroke={D.track} strokeWidth={thickness}
+            strokeLinecap="round" />
+          {/* Fill */}
+          {fillPath && (
+            <path d={fillPath} fill="none" stroke={color} strokeWidth={thickness}
+              strokeLinecap="round"
+              style={{ filter: `drop-shadow(0 0 6px ${color}66)` }} />
+          )}
+        </svg>
+        {/* Center text */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          paddingTop: 8,
+        }}>
+          <div style={{
+            fontFamily: 'Barlow Condensed, sans-serif',
+            fontSize: size * 0.22, fontWeight: 800,
+            color: D.txt, lineHeight: 1, letterSpacing: '-0.5px',
+          }}>
+            <CountUp target={current} decimals={current % 1 !== 0 ? 1 : 0} duration={1200} color={D.txt} />
+          </div>
+          <div style={{
+            fontFamily: 'IBM Plex Mono, monospace',
+            fontSize: size * 0.09, color: D.sub,
+            letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 2,
+          }}>{unit}</div>
+          {delta !== null && (
+            <div style={{
+              fontFamily: 'IBM Plex Mono, monospace',
+              fontSize: size * 0.09, fontWeight: 500,
+              color: deltaColor, marginTop: 4,
+              letterSpacing: '0.04em',
+            }}>
+              {delta > 0 ? '↑' : '↓'} {Math.abs(delta)}%
+            </div>
+          )}
+        </div>
+      </div>
+      {label && (
+        <div style={{
+          fontFamily: 'IBM Plex Mono, monospace',
+          fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase',
+          color: D.muted, textAlign: 'center',
+        }}>{label}</div>
+      )}
+    </div>
+  );
+};
+
 // ─── DONUT CHART ──────────────────────────────────────────────────────────────
-export const DonutChart = ({ segments, size = 180, thickness = 44, label, sublabel, t }) => {
-  const [hovered, setHovered] = useState(null);
+export const DonutChart = ({ segments, size = 180, thickness = 12, label, sublabel, animated = true, t }) => {
+  const [hovered, setHovered]   = useState(null);
+  const [drawPct, setDrawPct]   = useState(animated ? 0 : 1);
+  const raf = useRef(null);
+
+  useEffect(() => {
+    if (!animated) return;
+    const start = performance.now();
+    const dur = 900;
+    const tick = (now) => {
+      const p = Math.min((now - start) / dur, 1);
+      setDrawPct(1 - Math.pow(1 - p, 3));
+      if (p < 1) raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf.current);
+  }, [animated]);
+
   const GAP    = 3;
   const r      = (size - thickness) / 2;
   const cx     = size / 2;
@@ -12,15 +198,15 @@ export const DonutChart = ({ segments, size = 180, thickness = 44, label, sublab
   const total  = segments.reduce((s, g) => s + g.value, 0);
 
   if (total === 0) return (
-    <div style={{ width:size, height:size, display:'flex', alignItems:'center', justifyContent:'center', color:'#94A3B8', fontSize:13 }}>No data</div>
+    <div style={{ width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', color: D.muted, fontSize: 13 }}>No data</div>
   );
 
   let offset = 0;
   const slices = segments.map((seg, i) => {
     const pct   = seg.value / total;
-    const dash  = Math.max(0, pct * circum - GAP);
+    const dash  = Math.max(0, pct * circum * drawPct - GAP);
     const gap   = circum - dash;
-    const slice = { ...seg, dash, gap, offset, pct, index: i };
+    const slice = { ...seg, dash, gap, offset: offset * drawPct, pct, index: i };
     offset += pct * circum;
     return slice;
   });
@@ -28,32 +214,36 @@ export const DonutChart = ({ segments, size = 180, thickness = 44, label, sublab
   const hov = hovered !== null ? slices[hovered] : null;
 
   return (
-    <div style={{ position:'relative', width:size, height:size, flexShrink:0 }}>
-      <svg width={size} height={size} style={{ transform:'rotate(-90deg)' }}>
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#1A2235" strokeWidth={thickness} />
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        {/* Track */}
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke={D.track} strokeWidth={thickness} />
         {slices.map((s, i) => (
           <circle key={i} cx={cx} cy={cy} r={r} fill="none"
             stroke={s.color}
-            strokeWidth={hovered === i ? thickness + 5 : thickness}
+            strokeWidth={hovered === i ? thickness + 2 : thickness}
             strokeDasharray={`${s.dash} ${s.gap}`}
             strokeDashoffset={-s.offset}
             strokeLinecap="butt"
-            style={{ transition:'stroke-width 0.2s, filter 0.2s', cursor:'pointer', filter: hovered === i ? `drop-shadow(0 0 8px ${s.color}99)` : 'none' }}
+            style={{
+              transition: 'stroke-width 0.2s',
+              cursor: 'pointer',
+            }}
             onMouseEnter={() => setHovered(i)}
             onMouseLeave={() => setHovered(null)}
           />
         ))}
       </svg>
-      <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
         {hov ? (
           <>
-            <div style={{ fontSize:20, fontWeight:700, color:hov.color, fontFamily:fonts.ui, letterSpacing:'-0.4px', lineHeight:1 }}>{hov.value}</div>
-            <div style={{ fontSize:11, color:'#7A8BA0', marginTop:4, fontFamily:fonts.ui, textAlign:'center', maxWidth:80 }}>{hov.label}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: hov.color, fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '-0.3px', lineHeight: 1 }}>{hov.value}</div>
+            <div style={{ fontSize: 10, color: D.sub, marginTop: 4, fontFamily: 'IBM Plex Mono, monospace', textAlign: 'center', maxWidth: 80, letterSpacing: '0.06em' }}>{hov.label}</div>
           </>
         ) : (
           <>
-            <div style={{ fontSize:22, fontWeight:700, fontFamily:fonts.ui, letterSpacing:'-0.5px', lineHeight:1 }}>{label}</div>
-            {sublabel && <div style={{ fontSize:11, color:'#7A8BA0', marginTop:4, fontFamily:fonts.mono, textAlign:'center' }}>{sublabel}</div>}
+            <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '-0.5px', lineHeight: 1, color: D.txt }}>{label}</div>
+            {sublabel && <div style={{ fontSize: 10, color: D.muted, marginTop: 4, fontFamily: 'IBM Plex Mono, monospace', textAlign: 'center', letterSpacing: '0.08em' }}>{sublabel}</div>}
           </>
         )}
       </div>
@@ -62,25 +252,25 @@ export const DonutChart = ({ segments, size = 180, thickness = 44, label, sublab
 };
 
 // ─── LEGEND ───────────────────────────────────────────────────────────────────
-export const ChartLegend = ({ segments, t }) => (
-  <div style={{ display:'flex', flexDirection:'column', gap:10, justifyContent:'center' }}>
+export const ChartLegend = ({ segments }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, justifyContent: 'center' }}>
     {segments.map((s, i) => (
-      <div key={i} style={{ display:'flex', alignItems:'center', gap:10 }}>
-        <div style={{ width:12, height:12, borderRadius:3, background:s.color, flexShrink:0 }} />
-        <div style={{ flex:1, fontSize:13, color:t.textSub }}>{s.label}</div>
-        <div style={{ fontSize:13, fontWeight:600, color:t.text, fontFamily:fonts.ui }}>{s.value}</div>
-        <div style={{ fontSize:11, color:t.textMuted, fontFamily:fonts.mono, width:36, textAlign:'right' }}>{s.pct ? `${Math.round(s.pct*100)}%` : ''}</div>
+      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 10, height: 10, borderRadius: 3, background: s.color, flexShrink: 0 }} />
+        <div style={{ flex: 1, fontSize: 12, color: D.sub, fontFamily: 'Outfit, sans-serif' }}>{s.label}</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: D.txt, fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '-0.2px' }}>{s.value}</div>
+        <div style={{ fontSize: 10, color: D.muted, fontFamily: 'IBM Plex Mono, monospace', width: 36, textAlign: 'right' }}>{s.pct ? `${Math.round(s.pct * 100)}%` : ''}</div>
       </div>
     ))}
   </div>
 );
 
 // ─── LINE CHART ───────────────────────────────────────────────────────────────
-export const LineChart = ({ lines, t, isDark, unit = 'units', height = 200, curved = false }) => {
+export const LineChart = ({ lines, unit = 'units', height = 220, curved = false }) => {
   const [hovered, setHovered] = useState(null);
 
   if (!lines || lines.length === 0 || lines[0].points.length === 0) {
-    return <div style={{ textAlign:'center', padding:'48px 0', color:t.textMuted, fontSize:13 }}>No comparison data</div>;
+    return <div style={{ textAlign: 'center', padding: '48px 0', color: D.muted, fontSize: 13, fontFamily: 'IBM Plex Mono, monospace' }}>No data</div>;
   }
 
   const allVals = lines.flatMap(l => l.points.map(p => p.value));
@@ -88,72 +278,70 @@ export const LineChart = ({ lines, t, isDark, unit = 'units', height = 200, curv
   const labels  = lines[0].points.map(p => p.label);
   const W       = 600;
   const H       = height;
-  const PAD     = { top:24, right:16, bottom:32, left:44 };
+  const PAD     = { top: 24, right: 16, bottom: 32, left: 44 };
   const innerW  = W - PAD.left - PAD.right;
-  const innerH  = H - PAD.top  - PAD.bottom;
+  const innerH  = H - PAD.top - PAD.bottom;
 
   const xPos = (i) => PAD.left + (i / (labels.length - 1 || 1)) * innerW;
-  const yPos = (v) => PAD.top  + innerH - (v / maxVal) * innerH;
+  const yPos = (v) => PAD.top + innerH - (v / maxVal) * innerH;
 
-   const bezierFor = (pts) => {
+  const pathFor = (pts) => {
     if (!pts || pts.length === 0) return '';
-    if (!curved) {
-      // straight segments
-      return pts.map((p, i) => (i === 0 ? `M ${xPos(i)} ${yPos(p.value)}` : `L ${xPos(i)} ${yPos(p.value)}`)).join(' ');
-    }
-    // curved (bezier) segments
-    if (pts.length < 2) return `M ${xPos(0)} ${yPos(pts[0]?.value || 0)}`;
+    if (!curved) return pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xPos(i)} ${yPos(p.value)}`).join(' ');
     return pts.map((p, i) => {
       if (i === 0) return `M ${xPos(i)} ${yPos(p.value)}`;
       const x1 = xPos(i - 0.5);
-      const x2 = xPos(i - 0.5);
-      return `C ${x1} ${yPos(pts[i-1].value)}, ${x2} ${yPos(p.value)}, ${xPos(i)} ${yPos(p.value)}`;
+      return `C ${x1} ${yPos(pts[i - 1].value)}, ${x1} ${yPos(p.value)}, ${xPos(i)} ${yPos(p.value)}`;
     }).join(' ');
   };
 
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map(p => Math.round(maxVal * p));
 
   return (
-    <div style={{ position:'relative' }}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:'auto', overflow:'visible' }}>
+    <div style={{ position: 'relative' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
+        <defs>
+          {lines.map((line, li) => (
+            <linearGradient key={li} id={`lcgrad-${li}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stopColor={line.color} stopOpacity="0.18" />
+              <stop offset="100%" stopColor={line.color} stopOpacity="0.01" />
+            </linearGradient>
+          ))}
+        </defs>
+
         {/* Grid */}
         {yTicks.map((v, i) => (
           <g key={i}>
             <line x1={PAD.left} y1={yPos(v)} x2={W - PAD.right} y2={yPos(v)}
-              stroke={isDark ? '#1A2235' : '#E4E8F0'} strokeWidth={1} strokeDasharray="4 4" />
+              stroke={D.grid} strokeWidth={1} strokeDasharray="4 5" />
             <text x={PAD.left - 8} y={yPos(v) + 4} textAnchor="end"
-              fontSize={10} fill={t.textMuted} fontFamily={fonts.mono}>{v}</text>
+              fontSize={10} fill={D.muted} fontFamily="IBM Plex Mono, monospace">{v}</text>
           </g>
         ))}
 
         {/* X labels */}
         {labels.map((l, i) => (
           <text key={i} x={xPos(i)} y={H - 4} textAnchor="middle"
-            fontSize={10} fill={t.textMuted} fontFamily={fonts.mono}>{l}</text>
+            fontSize={10} fill={D.muted} fontFamily="IBM Plex Mono, monospace">{l}</text>
         ))}
 
-        {/* Lines + areas */}
+        {/* Area + line + dots */}
         {lines.map((line, li) => {
           const pts = line.points;
-          const areaPath = `${bezierFor(pts)} L ${xPos(pts.length-1)} ${yPos(0)} L ${xPos(0)} ${yPos(0)} Z`;
+          const areaPath = `${pathFor(pts)} L ${xPos(pts.length - 1)} ${yPos(0)} L ${xPos(0)} ${yPos(0)} Z`;
           return (
             <g key={li}>
-              <defs>
-                <linearGradient id={`grad-${li}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor={line.color} stopOpacity="0.2" />
-                  <stop offset="100%" stopColor={line.color} stopOpacity="0.01" />
-                </linearGradient>
-              </defs>
-              <path d={areaPath} fill={`url(#grad-${li})`} />
-              <path d={bezierFor(pts)} fill="none" stroke={line.color}
-                strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
-                style={{ filter:`drop-shadow(0 2px 4px ${line.color}44)` }} />
+              <path d={areaPath} fill={`url(#lcgrad-${li})`} />
+              <path d={pathFor(pts)} fill="none" stroke={line.color}
+                strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+                style={{ filter: `drop-shadow(0 2px 5px ${line.color}44)` }} />
               {pts.map((p, pi) => {
                 const isHov = hovered?.lineIdx === li && hovered?.pointIdx === pi;
                 return (
-                  <circle key={pi} cx={xPos(pi)} cy={yPos(p.value)} r={isHov ? 7 : 4}
-                    fill={line.color} stroke={isDark ? '#0F1628' : '#fff'} strokeWidth={2}
-                    style={{ cursor:'pointer', transition:'r 0.15s', filter: isHov ? `drop-shadow(0 0 6px ${line.color})` : 'none' }}
+                  <circle key={pi} cx={xPos(pi)} cy={yPos(p.value)}
+                    r={isHov ? 6 : 3.5}
+                    fill={line.color} stroke={D.bg} strokeWidth={1.5}
+                    style={{ cursor: 'pointer', transition: 'r 0.15s', filter: isHov ? `drop-shadow(0 0 6px ${line.color})` : 'none' }}
                     onMouseEnter={() => setHovered({ lineIdx: li, pointIdx: pi })}
                     onMouseLeave={() => setHovered(null)}
                   />
@@ -163,31 +351,26 @@ export const LineChart = ({ lines, t, isDark, unit = 'units', height = 200, curv
           );
         })}
 
-        {/* Tooltip — clamped horizontally so it never exits the SVG viewport */}
+        {/* Tooltip */}
         {hovered && (() => {
-          const line  = lines[hovered.lineIdx];
-          const pt    = line.points[hovered.pointIdx];
-          const dotX  = xPos(hovered.pointIdx);
-          const dotY  = yPos(pt.value);
-          const boxW  = 90;
-          const boxH  = 32;
-          const GAP   = 10;
-          const above = dotY - GAP - boxH;
-          const below = dotY + GAP;
-          const ty    = above < PAD.top ? below : above;
-          const bx    = Math.max(PAD.left, Math.min(dotX - boxW / 2, W - PAD.right - boxW));
+          const line = lines[hovered.lineIdx];
+          const pt   = line.points[hovered.pointIdx];
+          const dotX = xPos(hovered.pointIdx);
+          const dotY = yPos(pt.value);
+          const bW = 84; const bH = 32; const gap = 10;
+          const ty = dotY - gap - bH < PAD.top ? dotY + gap : dotY - gap - bH;
+          const bx = Math.max(PAD.left, Math.min(dotX - bW / 2, W - PAD.right - bW));
           return (
-            <g style={{ pointerEvents:'none' }}>
-              <rect x={bx} y={ty} width={boxW} height={boxH} rx={7}
-                fill={isDark ? '#1A2235' : '#fff'}
-                stroke={isDark ? '#2A3550' : '#E4E8F0'} strokeWidth={1}
-                style={{ filter:'drop-shadow(0 2px 10px rgba(0,0,0,0.18))' }} />
-              <text x={bx + boxW/2} y={ty + 13} textAnchor="middle"
-                fontSize={12} fontWeight="600" fill={line.color} fontFamily={fonts.ui}>
+            <g style={{ pointerEvents: 'none' }}>
+              <rect x={bx} y={ty} width={bW} height={bH} rx={6}
+                fill={D.tooltip} stroke={D.border} strokeWidth={0.5}
+                style={{ filter: 'drop-shadow(0 3px 10px rgba(0,0,0,0.4))' }} />
+              <text x={bx + bW / 2} y={ty + 13} textAnchor="middle"
+                fontSize={10} fontWeight="700" fill={line.color} fontFamily="Barlow Condensed, sans-serif" letterSpacing="0.1">
                 {pt.value} {unit}
               </text>
-              <text x={bx + boxW/2} y={ty + 26} textAnchor="middle"
-                fontSize={9} fill={t.textMuted} fontFamily={fonts.mono}>
+              <text x={bx + bW / 2} y={ty + 25} textAnchor="middle"
+                fontSize={8} fill={D.muted} fontFamily="IBM Plex Mono, monospace">
                 {line.label.split(' ')[0]} · {pt.label}
               </text>
             </g>
@@ -196,11 +379,11 @@ export const LineChart = ({ lines, t, isDark, unit = 'units', height = 200, curv
       </svg>
 
       {/* Legend */}
-      <div style={{ display:'flex', gap:16, justifyContent:'center', marginTop:8, flexWrap:'wrap' }}>
+      <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 10, flexWrap: 'wrap' }}>
         {lines.map((line, i) => (
-          <div key={i} style={{ display:'flex', alignItems:'center', gap:6 }}>
-            <div style={{ width:24, height:3, borderRadius:2, background:line.color }} />
-            <span style={{ fontSize:12, color:t.textSub, fontFamily:fonts.ui }}>{line.label}</span>
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 20, height: 2, borderRadius: 2, background: line.color }} />
+            <span style={{ fontSize: 11, color: D.sub, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.06em' }}>{line.label}</span>
           </div>
         ))}
       </div>
@@ -209,116 +392,90 @@ export const LineChart = ({ lines, t, isDark, unit = 'units', height = 200, curv
 };
 
 // ─── BAR CHART ────────────────────────────────────────────────────────────────
-// The tooltip is rendered at the chart root (not inside each bar) to completely
-// avoid any overflow clipping from parent containers.
-export const BarChart = ({ data, gradient, glow, unit, t, isDark, onBarClick, activeBar }) => {
+export const BarChart = ({ data, gradient, glow, unit, onBarClick, activeBar }) => {
   const [hovered, setHovered]       = useState(null);
   const [tooltipPos, setTooltipPos] = useState(null);
   const chartRef = useRef(null);
 
   if (!data || data.length === 0) return (
-    <div style={{ textAlign:'center', padding:'48px 0', color:t.textMuted, fontSize:13 }}>No usage data</div>
+    <div style={{ textAlign: 'center', padding: '48px 0', color: D.muted, fontSize: 13, fontFamily: 'IBM Plex Mono, monospace' }}>No usage data</div>
   );
 
-    // Build stable integer ticks for low/zero-heavy data so labels don't repeat.
-  const buildYAxisTicks = (maxValue) => {
-    const tickCount = 5;
-    const minAxisMax = 4; // ensures 0,1,2,3,4 at minimum visual range
-    const safeMax = Math.max(Number(maxValue) || 0, 0);
-    const desiredMax = Math.max(minAxisMax, Math.ceil(safeMax));
-    const step = Math.max(1, Math.ceil(desiredMax / (tickCount - 1)));
-    const axisMax = step * (tickCount - 1);
-    return Array.from({ length: tickCount }, (_, i) => i * step);
+  const buildTicks = (maxVal) => {
+    const count = 5;
+    const safe  = Math.max(Number(maxVal) || 0, 4);
+    const step  = Math.max(1, Math.ceil(safe / (count - 1)));
+    const top   = step * (count - 1);
+    return Array.from({ length: count }, (_, i) => i * step);
   };
 
-  const dataMax = Math.max(...data.map(d => Number(d.value) || 0), 0);
-  const yTicks = buildYAxisTicks(dataMax);
-  const axisMax = yTicks[yTicks.length - 1] || 1;
+  const dataMax  = Math.max(...data.map(d => Number(d.value) || 0), 0);
+  const yTicks   = buildTicks(dataMax);
+  const axisMax  = yTicks[yTicks.length - 1] || 1;
 
-  const handleMouseEnter = (i, e) => {
+  const handleEnter = (i, e) => {
     setHovered(i);
     if (chartRef.current) {
-      const chartRect = chartRef.current.getBoundingClientRect();
-      const barRect   = e.currentTarget.getBoundingClientRect();
-      const centerX   = barRect.left + barRect.width / 2 - chartRect.left;
-      const topY      = barRect.top - chartRect.top;
-      setTooltipPos({ x: centerX, y: topY });
+      const cr = chartRef.current.getBoundingClientRect();
+      const br = e.currentTarget.getBoundingClientRect();
+      setTooltipPos({ x: br.left + br.width / 2 - cr.left, y: br.top - cr.top });
     }
   };
 
-  const handleMouseLeave = () => {
-    setHovered(null);
-    setTooltipPos(null);
-  };
-
-  const hoveredData = hovered !== null ? data[hovered] : null;
-
   return (
-    <div ref={chartRef} style={{ position:'relative' }}>
-
-      {/* ── Tooltip rendered here at chart root — never clipped ── */}
-      {hoveredData && tooltipPos && (
+    <div ref={chartRef} style={{ position: 'relative' }}>
+      {/* Tooltip */}
+      {hovered !== null && tooltipPos && (
         <div style={{
-          position:      'absolute',
-          top:           tooltipPos.y - 42,
-          left:          tooltipPos.x,
-          transform:     'translateX(-50%)',
-          background:    isDark ? '#1A2235' : '#fff',
-          border:        `1px solid ${isDark ? '#2A3550' : '#E4E8F0'}`,
-          borderRadius:  8,
-          padding:       '5px 12px',
-          fontSize:      12,
-          color:         t.text,
-          fontFamily:    fonts.mono,
-          whiteSpace:    'nowrap',
-          boxShadow:     '0 4px 16px rgba(0,0,0,0.18)',
-          pointerEvents: 'none',
-          zIndex:        999,
+          position: 'absolute', top: tooltipPos.y - 44, left: tooltipPos.x,
+          transform: 'translateX(-50%)',
+          background: D.tooltip, border: `0.5px solid ${D.border}`,
+          borderRadius: 8, padding: '5px 12px',
+          fontFamily: 'IBM Plex Mono, monospace', fontSize: 11,
+          color: D.txt, whiteSpace: 'nowrap',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5)', pointerEvents: 'none', zIndex: 999,
         }}>
-          {hoveredData.value} {unit}{onBarClick ? ' · click to drill in' : ''}
+          <span style={{ color: glow, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700 }}>
+            {data[hovered].value}
+          </span>
+          {' '}{unit}{onBarClick ? ' · click to drill in' : ''}
         </div>
       )}
 
-      <div style={{ display:'flex', gap:0 }}>
-       {/* Y axis */}
-        <div style={{ display:'flex', flexDirection:'column', justifyContent:'space-between', paddingBottom:28, paddingRight:10, minWidth:40 }}>
+      <div style={{ display: 'flex', gap: 0 }}>
+        {/* Y axis */}
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', paddingBottom: 28, paddingRight: 10, minWidth: 38 }}>
           {[...yTicks].reverse().map(v => (
-            <div key={v} style={{ fontSize:10, color:t.textMuted, fontFamily:fonts.mono, textAlign:'right' }}>{v}</div>
+            <div key={v} style={{ fontSize: 10, color: D.muted, fontFamily: 'IBM Plex Mono, monospace', textAlign: 'right' }}>{v}</div>
           ))}
         </div>
 
-        {/* Bars */}
-        <div style={{ flex:1, position:'relative' }}>
+        {/* Bars area */}
+        <div style={{ flex: 1, position: 'relative' }}>
           {/* Grid lines */}
-          {[0,25,50,75,100].map(p => (
-            <div key={p} style={{ position:'absolute', left:0, right:0, top:`${p}%`, borderTop:`1px dashed ${isDark ? '#1A2235' : '#E4E8F0'}`, pointerEvents:'none' }} />
+          {[0, 25, 50, 75, 100].map(p => (
+            <div key={p} style={{ position: 'absolute', left: 0, right: 0, top: `${p}%`, borderTop: `1px dashed ${D.grid}`, pointerEvents: 'none' }} />
           ))}
 
-          <div style={{ display:'flex', alignItems:'flex-end', height:200, gap:5, position:'relative', zIndex:1 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', height: 200, gap: 4, position: 'relative', zIndex: 1 }}>
             {data.map((d, i) => {
-              const pct    = axisMax > 0 ? (d.value / axisMax) * 100 : 0;
-              const isHov = hovered === i;
-              const isAct = activeBar === d.label;
-              const lit   = isHov || isAct;
+              const pct = axisMax > 0 ? (d.value / axisMax) * 100 : 0;
+              const lit = hovered === i || activeBar === d.label;
               return (
                 <div key={i}
-                  style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', height:'100%', justifyContent:'flex-end', position:'relative', cursor: onBarClick ? 'pointer' : 'default' }}
-                  onMouseEnter={(e) => handleMouseEnter(i, e)}
-                  onMouseLeave={handleMouseLeave}
-                  onClick={(e) => {
-                    // prevent any default navigation or form submit bubbling
-                    try { e.preventDefault?.(); e.stopPropagation?.(); } catch (err) {}
-                    onBarClick && onBarClick(d, e);
-                  }}
+                  style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end', cursor: onBarClick ? 'pointer' : 'default' }}
+                  onMouseEnter={(e) => handleEnter(i, e)}
+                  onMouseLeave={() => { setHovered(null); setTooltipPos(null); }}
+                  onClick={(e) => { e.stopPropagation(); onBarClick && onBarClick(d, e); }}
                 >
                   <div style={{
-                    width:        '100%',
-                    borderRadius: '5px 5px 0 0',
-                    height:       d.value > 0 ? `${Math.max(pct, 2)}%` : '0%',
-                    background:   lit ? gradient : (isDark ? 'rgba(255,255,255,0.06)' : '#E8ECF5'),
-                    boxShadow:    lit ? `0 0 14px ${glow}` : 'none',
-                    transition:   'all 0.2s',
-                    outline:      isAct ? `2px solid ${glow}` : 'none',
+                    width: '100%',
+                    borderRadius: '4px 4px 0 0',
+                    height: d.value > 0 ? `${Math.max(pct, 2)}%` : '0%',
+                    background: lit ? gradient : D.track,
+                    boxShadow: lit ? `0 0 16px ${glow}55` : 'none',
+                    outline: activeBar === d.label ? `1.5px solid ${glow}` : 'none',
+                    transition: 'all 0.2s ease',
                   }} />
                 </div>
               );
@@ -326,9 +483,15 @@ export const BarChart = ({ data, gradient, glow, unit, t, isDark, onBarClick, ac
           </div>
 
           {/* X labels */}
-          <div style={{ display:'flex', gap:5, marginTop:6 }}>
+          <div style={{ display: 'flex', gap: 4, marginTop: 7 }}>
             {data.map((d, i) => (
-              <div key={i} style={{ flex:1, textAlign:'center', fontSize:10, color: (hovered === i || activeBar === d.label) ? t.primary : t.textMuted, fontFamily:fonts.mono, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', transition:'color 0.15s' }}>
+              <div key={i} style={{
+                flex: 1, textAlign: 'center', fontSize: 10,
+                color: (hovered === i || activeBar === d.label) ? glow : D.muted,
+                fontFamily: 'IBM Plex Mono, monospace',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                transition: 'color 0.15s',
+              }}>
                 {d.label}
               </div>
             ))}

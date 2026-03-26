@@ -90,7 +90,7 @@ const ConnectionCard = ({ conn, t, isDark, onOpen }) => {
             fontSize:12,
             fontWeight:600,
             fontFamily:fonts.ui,
-            background:isDark ? 'rgba(77,125,255,0.18)' : '#EEF2FF',
+            background:'rgba(204,255,0,0.08)',
             color:t.primary,
           }}
         >
@@ -148,7 +148,7 @@ const MyConnections = () => {
         </div>
         <button
           onClick={() => navigate('/consumer/applications')}
-          style={{ display:'flex', alignItems:'center', gap:8, padding:'11px 20px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#3B6FFF,#2952D9)', color:'#fff', fontSize:14, fontWeight:600, fontFamily:fonts.ui, cursor:'pointer', boxShadow:'0 4px 16px rgba(59,111,255,0.3)', whiteSpace:'nowrap' }}
+          style={{ display:'flex', alignItems:'center', gap:8, padding:'11px 20px', borderRadius:12, border:'none', background:'#CCFF00', color:'#0E0E0E', fontSize:14, fontWeight:600, fontFamily:fonts.ui, cursor:'pointer', boxShadow:'0 4px 16px rgba(204,255,0,0.25)', whiteSpace:'nowrap' }}
         >
           <span style={{ fontSize:18, lineHeight:1 }}>+</span> New Connection
         </button>
@@ -169,7 +169,7 @@ const MyConnections = () => {
       <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
         {FILTERS.map(f => (
           <button key={f} onClick={() => setFilter(f)}
-            style={{ padding:'7px 16px', borderRadius:100, border:`1.5px solid ${filter===f ? t.primary : t.border}`, background:filter===f ? (isDark?'rgba(59,111,255,0.15)':'#EEF2FF') : 'transparent', color:filter===f ? t.primary : t.textSub, fontSize:13, fontWeight:500, fontFamily:fonts.ui, cursor:'pointer', transition:'all 0.15s' }}>
+            style={{ padding:'7px 16px', borderRadius:100, border:`1.5px solid ${filter===f ? t.primary : t.border}`, background:filter===f ? 'rgba(204,255,0,0.08)' : 'transparent', color:filter===f ? t.primary : t.textSub, fontSize:13, fontWeight:500, fontFamily:fonts.ui, cursor:'pointer', transition:'all 0.15s' }}>
             {f}
             {f !== 'All' && <span style={{ marginLeft:5, fontSize:11, opacity:0.7 }}>{connections.filter(c => (c.connection_status || '').toLowerCase() === f.toLowerCase()).length}</span>}
           </button>
@@ -195,7 +195,7 @@ const MyConnections = () => {
           </div>
           {filter === 'All' && (
             <button onClick={() => navigate('/consumer/applications')}
-              style={{ padding:'10px 22px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#3B6FFF,#2952D9)', color:'#fff', fontSize:13, fontWeight:600, fontFamily:fonts.ui, cursor:'pointer', boxShadow:'0 4px 14px rgba(59,111,255,0.3)' }}>
+              style={{ padding:'10px 22px', borderRadius:10, border:'none', background:'#CCFF00', color:'#0E0E0E', fontSize:13, fontWeight:600, fontFamily:fonts.ui, cursor:'pointer', boxShadow:'0 4px 14px rgba(204,255,0,0.25)' }}>
               Apply for Connection
             </button>
           )}

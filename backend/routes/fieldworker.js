@@ -61,7 +61,15 @@ router.put('/jobs/:id/status', async (req, res) => {
     if (result.rows.length === 0)
       return res.status(404).json({ error: 'Job not found or not assigned to you' });
 
-    res.json({ message: 'Job status updated', data: result.rows[0] });
+    const updatedComplaint = result.rows[0];
+
+    // Send notification to consumer
+    const { sendNotification } = require('../socket');
+    const msg = `Complaint #${updatedComplaint.complaint_id} status updated to ${updatedComplaint.status}`;
+    const dotColor = updatedComplaint.status === 'Resolved' ? 'bg-lime' : 'bg-orange';
+    sendNotification(updatedComplaint.consumer_id, msg, dotColor);
+
+    res.json({ message: 'Job status updated', data: updatedComplaint });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Database error' });

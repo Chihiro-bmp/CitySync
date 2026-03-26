@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../Layout/ThemeContext';
 import { tokens, fonts, utilities } from '../../theme';
 import { ElectricityIcon, WaterIcon, GasIcon } from '../../Icons';
-import { BarChart, LineChart } from '../Charts';
+import { BarChart, LineChart, DonutChart, ChartLegend, CountUp } from '../Charts';
 
 const UtilIcons = { electricity: ElectricityIcon, water: WaterIcon, gas: GasIcon };
 // const PERIODS   = ['3 months', '6 months', '12 months'];
@@ -63,6 +63,7 @@ const UsageHistory = () => {
   const [period,     setPeriod]     = useState(6);
   // Separate states to decouple bar (month) and line series
   const [monthUsage, setMonthUsage] = useState([]);
+  const [allMonthUsage, setAllMonthUsage] = useState([]); // All data for pie chart
   const [lineUsage,  setLineUsage]  = useState([]);
   const [connections, setConnections] = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -107,6 +108,7 @@ const UsageHistory = () => {
       else if (setTo === 'line') setLineUsage(normalized);
       else if (setTo === 'both') { setMonthUsage(normalized); setLineUsage(normalized); }
       else if (setTo === 'drill') setMonthUsage(normalized);
+      else if (setTo === 'all') setAllMonthUsage(normalized);
 
       return data;
     } catch (err) {
@@ -127,11 +129,12 @@ const UsageHistory = () => {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          // Keep only id, name and optional utility type to avoid passing large payload into state
           const mapped = data.map(c => ({ id: c.connection_id, name: c.connection_name, utility: c.utility_tag, unit: c.unit_of_measurement }));
           setConnections(mapped);
-          // Initialize once; do not reset user-selected tab on subsequent re-renders.
           setActiveTab(prev => prev ?? mapped[0].id);
+          
+          // Also fetch all usage for the pie chart
+          fetchUsageData('month', null, '', 'all');
           return;
         }
       } else {
@@ -140,7 +143,6 @@ const UsageHistory = () => {
       }
     } catch (err) {
       console.error(err);
-      // ensure we still try to load usage
       await fetchUsageData('month', null, '', 'both');
     } finally {
       setLoading(false);
@@ -196,9 +198,26 @@ const UsageHistory = () => {
   // Fuzzy-match utility tag to theme key
   const resolveUtil = (tag) => {
     if (!tag) return utilities.electricity;
-    if (utilities[tag]) return utilities[tag];
-    const k = Object.keys(utilities).find(k => tag.includes(k) || k.includes(tag));
-    return utilities[k] || utilities.electricity;
+    const key = Object.keys(utilities).find(k => tag.includes(k) || k.includes(tag)) || 'electricity';
+    const base = utilities[key];
+
+    // Mute colors for UsageHistory
+    const muteGrad = (grad) => grad.replace(/([0-9A-Fa-f]{6})/g, (m) => {
+      // Very simple way to "tone down": reduce brightness/saturation by shifting the color
+      // But a better way is to just use fixed muted colors if we want precision.
+      // Let's use a simpler mapping for "muted" version.
+      return m; 
+    });
+
+    const mutedColors = {
+      electricity: { grad: 'linear-gradient(135deg,#D69E2E,#B7791F)', glow: 'rgba(214,158,46,0.1)' }, // Muted Gold/Amber
+      water:       { grad: 'linear-gradient(135deg,#5A67D8,#3C366B)', glow: 'rgba(90,103,216,0.1)' },  // Deep Indigo
+      gas:         { grad: 'linear-gradient(135deg,#38A169,#276749)', glow: 'rgba(56,161,105,0.1)' }, // Muted Green
+    };
+
+    const muted = mutedColors[key] || { grad: base.gradient, glow: base.glow };
+
+    return { ...base, gradient: muted.grad, glow: muted.glow };
   };
   const util = resolveUtil(activeUtility);
   const Icon = UtilIcons[activeUtility] || UtilIcons.electricity;
@@ -246,6 +265,29 @@ const UsageHistory = () => {
   const trend   = lastTwo.length === 2
     ? ((lastTwo[1].value - lastTwo[0].value) / (lastTwo[0].value || 1) * 100).toFixed(1)
     : null;
+
+  // Pie chart calculation (all utilities distribution)
+  const utilityTotals = allMonthUsage.reduce((acc, curr) => {
+    const raw = curr.__raw;
+    const uTag = raw.utility_tag || 'electricity';
+    acc[uTag] = (acc[uTag] || 0) + parseFloat(curr.units_logged || 0);
+    return acc;
+  }, {});
+
+  const pieSegments = Object.entries(utilityTotals).map(([tag, value]) => {
+    const u = resolveUtil(tag);
+    return {
+      tag, // keep tag for selection logic
+      label: u.label,
+      value: Math.round(value),
+      color: u.gradient.match(/#[A-Fa-f0-9]{6}/)?.[0] || '#3B6FFF',
+      pct: value / (Object.values(utilityTotals).reduce((a,b)=>a+b, 0) || 1)
+    };
+  }).sort((a,b) => b.value - a.value);
+
+  const selectedSegment = pieSegments.find(s => s.tag === activeUtility) || pieSegments[0];
+
+  const totalAllUnits = Object.values(utilityTotals).reduce((a,b)=>a+b, 0);
 
   // Shared nav button style
   const navBtn = (disabled) => ({
@@ -328,7 +370,7 @@ const UsageHistory = () => {
         {connections && connections.length > 0 && (
           <div style={{ display:'flex', gap:6 }}>
             {PERIODS.map(p => (
-              <button type="button" key={p} onClick={() => setPeriod(p)} style={{ padding:'6px 14px', borderRadius:100, border:`1.5px solid ${period === p ? t.primary : t.border}`, background: period === p ? (isDark ? 'rgba(59,111,255,0.15)' : '#EEF2FF') : 'transparent', color: period === p ? t.primary : t.textSub, fontSize:12, fontWeight:500, fontFamily:fonts.ui, cursor:'pointer', transition:'all 0.15s' }}>
+              <button type="button" key={p} onClick={() => setPeriod(p)} style={{ padding:'6px 14px', borderRadius:100, border:`1.5px solid ${period === p ? t.primary : t.border}`, background: period === p ? 'rgba(204,255,0,0.08)' : 'transparent', color: period === p ? t.primary : t.textSub, fontSize:12, fontWeight:500, fontFamily:fonts.ui, cursor:'pointer', transition:'all 0.15s' }}>
                 {PERIOD_LABELS[p]}
               </button>
             ))}
@@ -343,15 +385,65 @@ const UsageHistory = () => {
         </div>
       ) : (
         <>
-          {/* Stat pills */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(155px,1fr))', gap:12, marginBottom:20 }}>
-            <StatPill label="Total Usage"   value={`${Math.round(totalUnits)}`}  sub={unitLabel}            t={t} />
-            <StatPill label="Avg / Read"    value={`${avgUnits}`}                sub="Units per reading"    t={t} />
-            <StatPill label="Readings"      value={filtered.length}              sub="Total meter reads"    t={t} />
-            <StatPill label="Monthly Trend" value={trend !== null ? `${trend > 0 ? '↑' : '↓'} ${Math.abs(trend)}%` : '—'} sub="vs previous month" t={t} />
+          {/* 1. Comparison Pie Chart */}
+          <div style={{ background:t.bgCard, border:`1px solid ${t.border}`, borderRadius:16, padding:24, marginBottom:16 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
+              <div>
+                <div style={{ fontSize:15, fontWeight:600, color:t.text }}>Utility Usage Mix</div>
+                <div style={{ fontSize:12, color:t.textSub, marginTop:2 }}>Total consumption across all active services</div>
+              </div>
+              <div style={{ fontSize:18, fontWeight:700, fontFamily:fonts.display, color:t.text }}>
+                {Math.round(totalAllUnits).toLocaleString()} Total Units
+              </div>
+            </div>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:48, flexWrap:'wrap' }}>
+              <DonutChart 
+                segments={pieSegments} 
+                size={190} 
+                thickness={10} 
+                label={Math.round(selectedSegment?.pct * 100 || 0) + '%'} 
+                sublabel={selectedSegment?.label || 'Selected'} 
+                t={t} 
+              />
+              <ChartLegend segments={pieSegments} t={t} />
+            </div>
           </div>
 
-          {/* Period comparison line chart */}
+          {/* 2. Stat Pills with CountUp */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(155px,1fr))', gap:12, marginBottom:20 }}>
+            <div style={{ background:t.bgCard, border:`1px solid ${t.border}`, borderRadius:13, padding:'16px 18px' }}>
+              <div style={{ fontSize:11, color:t.textMuted, fontFamily:fonts.mono, letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:5 }}>Total Usage</div>
+              <div style={{ fontSize:22, fontWeight:600, color:t.text, letterSpacing:'-0.3px', fontFamily:fonts.ui }}>
+                <CountUp target={Math.round(totalUnits)} />
+              </div>
+              <div style={{ fontSize:11, color:t.textSub, marginTop:3 }}>{unitLabel}</div>
+            </div>
+            <div style={{ background:t.bgCard, border:`1px solid ${t.border}`, borderRadius:13, padding:'16px 18px' }}>
+              <div style={{ fontSize:11, color:t.textMuted, fontFamily:fonts.mono, letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:5 }}>Avg / Read</div>
+              <div style={{ fontSize:22, fontWeight:600, color:t.text, letterSpacing:'-0.3px', fontFamily:fonts.ui }}>
+                <CountUp target={parseFloat(avgUnits)} decimals={1} />
+              </div>
+              <div style={{ fontSize:11, color:t.textSub, marginTop:3 }}>Units per reading</div>
+            </div>
+            <div style={{ background:t.bgCard, border:`1px solid ${t.border}`, borderRadius:13, padding:'16px 18px' }}>
+              <div style={{ fontSize:11, color:t.textMuted, fontFamily:fonts.mono, letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:5 }}>Readings</div>
+              <div style={{ fontSize:22, fontWeight:600, color:t.text, letterSpacing:'-0.3px', fontFamily:fonts.ui }}>
+                <CountUp target={filtered.length} />
+              </div>
+              <div style={{ fontSize:11, color:t.textSub, marginTop:3 }}>Total meter reads</div>
+            </div>
+            <div style={{ background:t.bgCard, border:`1px solid ${t.border}`, borderRadius:13, padding:'16px 18px' }}>
+              <div style={{ fontSize:11, color:t.textMuted, fontFamily:fonts.mono, letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:5 }}>Monthly Trend</div>
+              <div style={{ fontSize:22, fontWeight:600, color: trend !== null ? (parseFloat(trend) > 0 ? '#F87171' : '#4ADE80') : t.text, letterSpacing:'-0.3px', fontFamily:fonts.ui }}>
+                {trend !== null && (trend > 0 ? '↑ ' : '↓ ')}
+                <CountUp target={Math.abs(parseFloat(trend || 0))} decimals={1} />
+                %
+              </div>
+              <div style={{ fontSize:11, color:t.textSub, marginTop:3 }}>vs previous month</div>
+            </div>
+          </div>
+
+          {/* 3. Period comparison line chart */}
           <div style={{ background:t.bgCard, border:`1px solid ${t.border}`, borderRadius:16, padding:24, marginBottom:16 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20, flexWrap:'wrap', gap:10 }}>
               <div>
@@ -373,7 +465,7 @@ const UsageHistory = () => {
             </div>
           </div>
 
-          {/* Monthly breakdown bar chart */}
+          {/* 4. Monthly breakdown bar chart */}
           <div style={{ background:t.bgCard, border:`1px solid ${t.border}`, borderRadius:16, padding:24, marginBottom:16 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, flexWrap:'wrap', gap:10 }}>
               <div>
@@ -385,7 +477,6 @@ const UsageHistory = () => {
                 </div>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                {/* Drill-down back button */}
                 {drillMonth && (
                   <button type="button" onClick={() => {
                     const cached = MONTH_USAGE_CACHE[activeTab] || MONTH_USAGE_CACHE['all'];
@@ -399,7 +490,6 @@ const UsageHistory = () => {
                     ← Back to months
                   </button>
                 )}
-                {/* Prev / Next navigation (only in month view) */}
                 {!drillMonth && (
                   <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                     <button type="button" disabled={barOffset >= maxOffset} onClick={() => setBarOffset(o => Math.min(o + monthCount, maxOffset))} style={navBtn(barOffset >= maxOffset)}>←</button>
@@ -433,41 +523,6 @@ const UsageHistory = () => {
                 onBarClick={(d, e) => handleBarClick(d, e)}
               />
             )}
-          </div>
-
-          {/* Reading log table */}
-          <div style={{ background:t.bgCard, border:`1px solid ${t.border}`, borderRadius:16, overflow:'hidden' }}>
-            <div style={{ padding:'16px 20px', borderBottom:`1px solid ${t.border}`, display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ width:32, height:32, borderRadius:9, background:util.gradient, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:`0 2px 8px ${util.glow}` }}>
-                <Icon size={15} color="#fff" />
-              </div>
-              <div style={{ fontSize:14, fontWeight:600, color:t.text }}>Meter Reading Log</div>
-              <div style={{ marginLeft:'auto', fontSize:12, color:t.textMuted, fontFamily:fonts.mono }}>{filtered.length} records</div>
-            </div>
-            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-              <thead>
-                <tr style={{ background: isDark ? '#0D1525' : '#F8FAFF' }}>
-                  {['Period', 'Units Logged', 'From', 'To'].map(h => (
-                    <th key={h} style={{ textAlign:'left', padding:'11px 16px', color:t.textMuted, fontWeight:600, fontSize:11, textTransform:'uppercase', letterSpacing:'0.07em', borderBottom:`1px solid ${t.border}` }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0
-                  ? <tr><td colSpan={4} style={{ textAlign:'center', padding:'40px', color:t.textMuted, fontSize:13 }}>No readings for {activeName}</td></tr>
-                  : filtered.map((u, i) => (
-                    <tr key={i} style={{ borderBottom:`1px solid ${t.border}` }}>
-                      <td style={{ padding:'12px 16px', color:t.textSub, fontFamily:fonts.mono, fontSize:12 }}>
-                        {new Date(u.time_from).toLocaleDateString('en-GB',{day:'numeric',month:'short'})} – {new Date(u.time_to).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}
-                      </td>
-                      <td style={{ padding:'12px 16px', fontWeight:600, color:t.text }}>{Math.round(u.units_logged)} <span style={{ fontSize:11, color:t.textMuted, fontWeight:400 }}>{u.unit_of_measurement}</span></td>
-                      <td style={{ padding:'12px 16px', color:t.textSub, fontFamily:fonts.mono, fontSize:12 }}>{new Date(u.time_from).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</td>
-                      <td style={{ padding:'12px 16px', color:t.textSub, fontFamily:fonts.mono, fontSize:12 }}>{new Date(u.time_to).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</td>
-                    </tr>
-                  ))
-                }
-              </tbody>
-            </table>
           </div>
         </>
       )}

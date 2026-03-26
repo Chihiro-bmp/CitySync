@@ -1,406 +1,241 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from './Layout/ThemeContext';
-import { tokens, fonts } from '../theme';
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
-const SparkleIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-    <path d="M12 2L13.09 8.26L19 6L14.74 10.91L21 12L14.74 13.09L19 18L13.09 15.74L12 22L10.91 15.74L5 18L9.26 13.09L3 12L9.26 10.91L5 6L10.91 8.26L12 2Z" fill="currentColor"/>
-  </svg>
-);
-
-const SendIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-    <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-    <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-  </svg>
-);
-
-const ClearIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-    <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-
-// ── Quick chips per role ──────────────────────────────────────────────────────
+// v3-style quick chips
 const CONSUMER_CHIPS = [
-  'Which month was my highest electricity usage?',
-  'Am I spending more than average on utilities?',
-  'How can I reduce my water bill?',
-  'Summarise my unpaid bills',
-  'What are my usage trends this year?',
+  'Why is my bill high?',
+  'Check my balance',
+  'Usage this week',
+  'File a complaint',
 ];
 
 const EMPLOYEE_CHIPS = [
   'Which region generates the most revenue?',
   'Where are we getting the most complaints?',
   'Who is our top-performing field worker?',
-  'Are we profitable this month?',
   'Which utility has the highest outstanding balance?',
 ];
 
-// ── Message bubble ────────────────────────────────────────────────────────────
-const Bubble = ({ msg, t, isDark }) => {
-  const isUser = msg.role === 'user';
-  return (
-    <div style={{
-      display: 'flex',
-      justifyContent: isUser ? 'flex-end' : 'flex-start',
-      marginBottom: 12,
-    }}>
-      {!isUser && (
-        <div style={{
-          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-          background: 'linear-gradient(135deg,#3B6FFF,#00C4FF)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          marginRight: 8, marginTop: 2,
-          boxShadow: '0 2px 8px rgba(59,111,255,0.35)',
-        }}>
-          <SparkleIcon />
-        </div>
-      )}
-      <div style={{
-        maxWidth: '82%',
-        padding: '10px 14px',
-        borderRadius: isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-        background: isUser
-          ? 'linear-gradient(135deg,#3B6FFF,#2952D9)'
-          : isDark ? '#0D1525' : '#F1F5FF',
-        color: isUser ? '#fff' : t.text,
-        fontSize: 13,
-        lineHeight: 1.65,
-        fontFamily: fonts.ui,
-        boxShadow: isUser
-          ? '0 2px 8px rgba(59,111,255,0.3)'
-          : `0 1px 3px rgba(0,0,0,0.08)`,
-        border: !isUser ? `1px solid ${t.border}` : 'none',
-        whiteSpace: 'pre-wrap',
-      }}>
-        {msg.content}
-      </div>
-    </div>
-  );
-};
-
-// ── Typing indicator ──────────────────────────────────────────────────────────
-const TypingDots = ({ t }) => (
-  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-    <div style={{ width:28, height:28, borderRadius:8, background:'linear-gradient(135deg,#3B6FFF,#00C4FF)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-      <SparkleIcon />
-    </div>
-    <div style={{ display:'flex', gap:4, padding:'10px 14px', borderRadius:'14px 14px 14px 4px', background: t.bgCard, border:`1px solid ${t.border}` }}>
-      {[0,1,2].map(i => (
-        <div key={i} style={{
-          width:6, height:6, borderRadius:'50%',
-          background: t.primary,
-          animation: `bounce 1.2s ease infinite`,
-          animationDelay: `${i * 0.2}s`,
-        }} />
-      ))}
-    </div>
-    <style>{`@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}`}</style>
-  </div>
+const BubbleIcon = () => (
+  <svg viewBox="0 0 24 24">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    <line x1="9" y1="10" x2="15" y2="10" />
+    <line x1="9" y1="14" x2="13" y2="14" />
+  </svg>
 );
 
-// ── Main Component ────────────────────────────────────────────────────────────
+const SunburstIcon = () => (
+  <svg viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" />
+  </svg>
+);
+
+const SendIcon = () => (
+  <svg viewBox="0 0 24 24">
+    <line x1="22" y1="2" x2="11" y2="13" />
+    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+  </svg>
+);
+
 const AIAssistant = ({ role }) => {
   const { authFetch } = useAuth();
-  const { isDark }    = useTheme();
-  const t = tokens[isDark ? 'dark' : 'light'];
 
-  const [open, setOpen]       = useState(false);
-  const [input, setInput]     = useState('');
-  const [history, setHistory] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState('');
+  const [history, setHistory] = useState([
+    {
+      role: 'assistant',
+      content:
+        role === 'consumer'
+          ? "Hi! Ask me anything about operations, regions, complaints, or performance."
+          : 'Hi! Ask me anything about operations, regions, complaints, or performance.',
+    },
+  ]);
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
-  const bottomRef = useRef(null);
-  const inputRef  = useRef(null);
+  const [error, setError] = useState('');
+
+  const wrapRef = useRef(null);
+  const messagesRef = useRef(null);
+  const inputRef = useRef(null);
 
   const chips = role === 'consumer' ? CONSUMER_CHIPS : EMPLOYEE_CHIPS;
   const endpoint = role === 'consumer' ? '/api/ai/consumer' : '/api/ai/employee';
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [history, loading]);
-
-  useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 300);
+    if (!open) return;
+    const onDoc = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
   }, [open]);
 
-  const send = useCallback(async (question) => {
-    const q = question || input.trim();
-    if (!q || loading) return;
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => inputRef.current?.focus(), 250);
+    return () => clearTimeout(t);
+  }, [open]);
 
-    setInput('');
-    setError('');
-    const newHistory = [...history, { role: 'user', content: q }];
-    setHistory(newHistory);
-    setLoading(true);
+  useEffect(() => {
+    if (!open) return;
+    messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: 'smooth' });
+  }, [open, history, loading]);
 
-    try {
-      const res  = await authFetch(endpoint, {
-        method: 'POST',
-        body: JSON.stringify({
-          question: q,
-          history: history.slice(-6), // last 3 turns for context
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+  const send = useCallback(
+    async (question) => {
+      const q = (question ?? input).trim();
+      if (!q || loading) return;
 
-      setHistory(prev => [...prev, { role: 'assistant', content: data.answer }]);
-    } catch (err) {
-      setError('AI unavailable right now. Please try again.');
-      setHistory(prev => prev.slice(0, -1)); // remove user msg on failure
-    } finally {
-      setLoading(false);
-    }
-  }, [input, history, loading, authFetch, endpoint]);
+      setInput('');
+      setError('');
+      setHistory((prev) => [...prev, { role: 'user', content: q }]);
+      setLoading(true);
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      send();
-    }
-  };
+      try {
+        const res = await authFetch(endpoint, {
+          method: 'POST',
+          body: JSON.stringify({
+            question: q,
+            history: history.slice(-6),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        setHistory((prev) => [...prev, { role: 'assistant', content: data.answer }]);
+      } catch (err) {
+        setError('AI unavailable right now. Please try again.');
+        setHistory((prev) => prev.slice(0, -1));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [authFetch, endpoint, history, input, loading]
+  );
 
   return (
-    <>
-      {/* ── Floating trigger button ── */}
+    <div ref={wrapRef}>
+      {/* Floating bubble */}
       <button
-        onClick={() => setOpen(o => !o)}
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="fixed bottom-6 right-6 z-[500] w-[50px] h-[50px] rounded-full flex items-center justify-center cursor-pointer backdrop-blur-xl transition-transform duration-300 border border-lime/30 shadow-[0_0_0_0_rgba(204,255,0,0)] hover:scale-[1.08] hover:border-lime/60 hover:shadow-[0_0_22px_rgba(204,255,0,0.15)]"
         style={{
-          position: 'fixed',
-          bottom: 28,
-          right: 28,
-          zIndex: 100,
-          width: 52,
-          height: 52,
-          borderRadius: '50%',
-          border: 'none',
-          background: open
-            ? (isDark ? '#1A2235' : '#E8EDFF')
-            : 'linear-gradient(135deg,#3B6FFF,#00C4FF)',
-          color: open ? t.primary : '#fff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          boxShadow: open
-            ? `0 2px 12px rgba(0,0,0,0.15)`
-            : '0 4px 20px rgba(59,111,255,0.45)',
-          transition: 'all 0.25s ease',
-          transform: open ? 'rotate(15deg)' : 'none',
+          background:
+            'linear-gradient(135deg,rgba(204,255,0,0.15),rgba(204,255,0,0.06))',
         }}
-        title={open ? 'Close AI Assistant' : 'Ask AI Assistant'}
+        title="Ask CitySync AI"
       >
-        {open ? <CloseIcon /> : <SparkleIcon />}
+        <span className="absolute -inset-1 rounded-full border border-lime/20 ai-pulse-ring" />
+        <span className="text-lime w-[22px] h-[22px]">
+          <BubbleIcon />
+        </span>
       </button>
 
-      {/* ── Slide-in panel ── */}
-      <div style={{
-        position: 'fixed',
-        bottom: 92,
-        right: 28,
-        width: 380,
-        height: 560,
-        zIndex: 99,
-        display: 'flex',
-        flexDirection: 'column',
-        background: isDark ? '#0B1120' : '#fff',
-        border: `1px solid ${t.border}`,
-        borderRadius: 20,
-        boxShadow: isDark
-          ? '0 24px 60px rgba(0,0,0,0.6)'
-          : '0 24px 60px rgba(0,0,0,0.14)',
-        overflow: 'hidden',
-        transform: open ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
-        opacity: open ? 1 : 0,
-        pointerEvents: open ? 'all' : 'none',
-        transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease',
-        transformOrigin: 'bottom right',
-      }}>
-
+      {/* Panel */}
+      <div
+        className={`fixed bottom-[84px] right-6 z-[500] w-[320px] rounded-2xl overflow-hidden border border-white/10 backdrop-blur-2xl transition-all duration-300 origin-bottom-right ${
+          open ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 translate-y-2.5 scale-[0.97] pointer-events-none'
+        }`}
+        style={{ background: 'rgba(12,12,12,0.96)' }}
+      >
         {/* Header */}
-        <div style={{
-          padding: '16px 18px',
-          borderBottom: `1px solid ${t.border}`,
-          background: isDark
-            ? 'linear-gradient(135deg, #0D1525 0%, #111827 100%)'
-            : 'linear-gradient(135deg, #EEF2FF 0%, #F0F9FF 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          flexShrink: 0,
-        }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 11,
-            background: 'linear-gradient(135deg,#3B6FFF,#00C4FF)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 3px 10px rgba(59,111,255,0.4)',
-            color: '#fff', flexShrink: 0,
-          }}>
-            <SparkleIcon />
+        <div className="px-4 py-3 border-b border-white/10 flex items-center gap-3">
+          <div className="w-7 h-7 rounded-lg bg-lime/10 border border-lime/20 flex items-center justify-center flex-shrink-0">
+            <span className="text-lime w-[14px] h-[14px]">
+              <SunburstIcon />
+            </span>
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: t.text, fontFamily: fonts.ui }}>
-              AI Assistant
-            </div>
-            <div style={{ fontSize: 11, color: t.textSub, fontFamily: fonts.mono }}>
-              {role === 'consumer' ? 'Powered by Gemini · Your utility advisor' : 'Powered by Gemini · Business insights'}
+          <div className="min-w-0">
+            <div className="font-rajdhani text-[15px] font-bold text-txt leading-none">CitySync AI</div>
+            <div className="font-mono text-[8px] uppercase tracking-widest text-lime/60 mt-0.5 leading-none">
+              ● Online · Ready
             </div>
           </div>
-          {history.length > 0 && (
-            <button
-              onClick={() => { setHistory([]); setError(''); }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.textMuted, padding: 4, display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontFamily: fonts.ui }}
-              title="Clear conversation"
-            >
-              <ClearIcon /> Clear
-            </button>
-          )}
         </div>
 
         {/* Messages */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '16px 14px',
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
-
-          {/* Welcome + chips */}
-          {history.length === 0 && !loading && (
-            <div>
-              <div style={{
-                textAlign: 'center', padding: '8px 0 20px',
-              }}>
-                <div style={{ fontSize: 13, color: t.textSub, lineHeight: 1.6 }}>
-                  {role === 'consumer'
-                    ? 'Ask me anything about your utility usage, bills, or how to save money.'
-                    : 'Ask me about revenue, complaints, field worker performance, or operational insights.'
-                  }
-                </div>
+        <div ref={messagesRef} className="px-4 pt-4 pb-2 flex flex-col gap-2 max-h-[220px] overflow-y-auto">
+          {history.map((m, idx) => (
+            <div key={idx} className={`flex gap-2 items-start ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+              <div
+                className={`text-[12px] leading-[1.55] px-3 py-2 rounded-[10px] max-w-[80%] ${
+                  m.role === 'user'
+                    ? 'bg-lime/10 border border-lime/20 text-txt/80'
+                    : 'bg-white/5 text-txt/70'
+                }`}
+              >
+                {m.content}
               </div>
-
-              <div style={{ fontSize: 11, color: t.textMuted, fontFamily: fonts.mono, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-                Quick questions
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                {chips.map((chip, i) => (
-                  <button
-                    key={i}
-                    onClick={() => send(chip)}
-                    style={{
-                      textAlign: 'left',
-                      padding: '9px 13px',
-                      borderRadius: 10,
-                      border: `1px solid ${t.border}`,
-                      background: isDark ? 'rgba(59,111,255,0.05)' : '#F8FAFF',
-                      color: t.text,
-                      fontSize: 12,
-                      fontFamily: fonts.ui,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s',
-                      lineHeight: 1.4,
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.borderColor = t.primary;
-                      e.currentTarget.style.background = isDark ? 'rgba(59,111,255,0.1)' : '#EEF2FF';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.borderColor = t.border;
-                      e.currentTarget.style.background = isDark ? 'rgba(59,111,255,0.05)' : '#F8FAFF';
-                    }}
-                  >
-                    {chip}
-                  </button>
-                ))}
+            </div>
+          ))}
+          {loading && (
+            <div className="flex gap-2 items-start">
+              <div className="text-[12px] leading-[1.55] px-3 py-2 rounded-[10px] max-w-[80%] bg-white/5 text-txt/50">
+                Checking your account data…
               </div>
             </div>
           )}
-
-          {/* Chat history */}
-          {history.map((msg, i) => (
-            <Bubble key={i} msg={msg} t={t} isDark={isDark} />
-          ))}
-
-          {loading && <TypingDots t={t} />}
-
           {error && (
-            <div style={{ fontSize: 12, color: isDark ? '#F87171' : '#B91C1C', padding: '8px 12px', borderRadius: 8, background: isDark ? '#2D0C0C' : '#FEE2E2', marginBottom: 8 }}>
+            <div className="text-[11px] font-mono text-red-500/80 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
               {error}
             </div>
           )}
+        </div>
 
-          <div ref={bottomRef} />
+        {/* Chips */}
+        <div className="px-4 pb-3 flex flex-wrap gap-1.5">
+          {chips.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => send(c)}
+              className="font-mono text-[8.5px] tracking-wide px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-txt/45 hover:border-lime/30 hover:text-lime/70 transition-colors"
+            >
+              {c}
+            </button>
+          ))}
         </div>
 
         {/* Input */}
-        <div style={{
-          padding: '12px 14px',
-          borderTop: `1px solid ${t.border}`,
-          display: 'flex',
-          gap: 8,
-          flexShrink: 0,
-          background: isDark ? '#080C18' : '#F8FAFF',
-        }}>
-          <textarea
+        <div className="px-3 py-2.5 border-t border-white/10 flex items-center gap-2">
+          <input
             ref={inputRef}
             value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask anything about your data…"
-            rows={1}
-            style={{
-              flex: 1,
-              padding: '9px 12px',
-              borderRadius: 10,
-              border: `1.5px solid ${t.border}`,
-              background: isDark ? '#0D1525' : '#fff',
-              color: t.text,
-              fontSize: 13,
-              fontFamily: fonts.ui,
-              outline: 'none',
-              resize: 'none',
-              lineHeight: 1.5,
-              maxHeight: 80,
-              overflowY: 'auto',
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') send();
             }}
-            onFocus={e => e.target.style.borderColor = t.primary}
-            onBlur={e => e.target.style.borderColor = t.border}
+            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-txt outline-none placeholder:text-txt/20 focus:border-lime/30"
+            placeholder="Ask anything about your utilities…"
           />
           <button
+            type="button"
             onClick={() => send()}
             disabled={!input.trim() || loading}
-            style={{
-              width: 38, height: 38,
-              borderRadius: 10,
-              border: 'none',
-              background: !input.trim() || loading
-                ? (isDark ? '#1A2235' : '#E8ECF5')
-                : 'linear-gradient(135deg,#3B6FFF,#2952D9)',
-              color: !input.trim() || loading ? t.textMuted : '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: !input.trim() || loading ? 'not-allowed' : 'pointer',
-              boxShadow: !input.trim() || loading ? 'none' : '0 3px 10px rgba(59,111,255,0.35)',
-              transition: 'all 0.2s',
-              flexShrink: 0,
-              alignSelf: 'flex-end',
-            }}
+            className="w-[30px] h-[30px] rounded-lg bg-lime/10 border border-lime/30 flex items-center justify-center text-lime disabled:opacity-40 disabled:cursor-not-allowed hover:bg-lime/20 transition-colors"
+            title="Send"
           >
-            <SendIcon />
+            <span className="w-[13px] h-[13px]">
+              <SendIcon />
+            </span>
           </button>
         </div>
       </div>
-    </>
+
+      <style>{`
+        .ai-pulse-ring{ animation:pulse-ring 2.5s ease-out infinite; }
+        @keyframes pulse-ring{
+          0%{ transform:scale(1); opacity:0.6; }
+          100%{ transform:scale(1.35); opacity:0; }
+        }
+        .ai-pulse-ring{ pointer-events:none; }
+        .ai-pulse-ring{ border-width:1px; }
+        .ai-pulse-ring{ border-color: rgba(204,255,0,0.18); }
+        .ai-pulse-ring{ position:absolute; }
+      `}</style>
+    </div>
   );
 };
 

@@ -188,7 +188,7 @@ const MyBills = () => {
             <div style={{ fontSize:14, fontWeight:600, color:t.text, marginBottom:4 }}>Bill Status</div>
             <div style={{ fontSize:12, color:t.textSub, marginBottom:16 }}>Distribution of all bills</div>
             <div style={{ display:'flex', alignItems:'center', gap:20 }}>
-              <DonutChart segments={statusSegments} size={130} thickness={28} label={bills.length} sublabel="total bills" t={t} />
+              <DonutChart segments={statusSegments} size={130} thickness={8} label={bills.length} sublabel="total bills" t={t} />
               <ChartLegend segments={statusSegments} t={t} />
             </div>
           </div>
@@ -198,7 +198,7 @@ const MyBills = () => {
             <div style={{ fontSize:14, fontWeight:600, color:t.text, marginBottom:4 }}>Spending by Utility</div>
             <div style={{ fontSize:12, color:t.textSub, marginBottom:16 }}>Total ৳ {Math.round(totalAmount).toLocaleString()}</div>
             <div style={{ display:'flex', alignItems:'center', gap:20 }}>
-              <DonutChart segments={utilitySpend} size={130} thickness={28} label={`৳${Math.round(totalAmount/1000)}k`} sublabel="total spent" t={t} />
+              <DonutChart segments={utilitySpend} size={130} thickness={10} label={`৳${Math.round(totalAmount/1000)}k`} sublabel="total spent" t={t} />
               <ChartLegend segments={utilitySpend.map(u=>({...u, value:`৳${u.value.toLocaleString()}`}))} t={t} />
             </div>
           </div>
@@ -208,7 +208,7 @@ const MyBills = () => {
             <div style={{ fontSize:14, fontWeight:600, color:t.text, marginBottom:4 }}>Bills by Utility</div>
             <div style={{ fontSize:12, color:t.textSub, marginBottom:16 }}>Count of bills per service</div>
             <div style={{ display:'flex', alignItems:'center', gap:20 }}>
-              <DonutChart segments={utilityCount} size={130} thickness={28} label={bills.length} sublabel="total bills" t={t} />
+              <DonutChart segments={utilityCount} size={130} thickness={10} label={bills.length} sublabel="total bills" t={t} />
               <ChartLegend segments={utilityCount} t={t} />
             </div>
           </div>
@@ -249,7 +249,7 @@ const MyBills = () => {
       {/* Type tabs (Prepaid / Postpaid) */}
       <div style={{ display:'flex', gap:8, marginBottom:10, flexWrap:'wrap' }}>
         {BILL_TYPES.map(bt => (
-          <button key={bt} onClick={() => setTypeFilter(bt)} style={{ padding:'6px 14px', borderRadius:100, border:`1.5px solid ${typeFilter===bt ? t.primary : t.border}`, background: typeFilter===bt ? (isDark?'rgba(59,111,255,0.12)':'#F3F7FF') : 'transparent', color: typeFilter===bt ? t.primary : t.textSub, fontSize:13, fontWeight:500, fontFamily:fonts.ui, cursor:'pointer', transition:'all 0.15s' }}>
+          <button key={bt} onClick={() => setTypeFilter(bt)} style={{ padding:'6px 14px', borderRadius:100, border:`1.5px solid ${typeFilter===bt ? t.primary : t.border}`, background: typeFilter===bt ? 'rgba(204,255,0,0.08)' : 'transparent', color: typeFilter===bt ? t.primary : t.textSub, fontSize:13, fontWeight:500, fontFamily:fonts.ui, cursor:'pointer', transition:'all 0.15s' }}>
             {bt}
           </button>
         ))}
@@ -258,7 +258,7 @@ const MyBills = () => {
       {/* Filter tabs */}
       <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
         {FILTERS.map(f => (
-          <button key={f} onClick={() => setFilter(f)} style={{ padding:'7px 16px', borderRadius:100, border:`1.5px solid ${filter===f ? t.primary : t.border}`, background: filter===f ? (isDark?'rgba(59,111,255,0.15)':'#EEF2FF') : 'transparent', color: filter===f ? t.primary : t.textSub, fontSize:13, fontWeight:500, fontFamily:fonts.ui, cursor:'pointer', transition:'all 0.15s' }}>
+          <button key={f} onClick={() => setFilter(f)} style={{ padding:'7px 16px', borderRadius:100, border:`1.5px solid ${filter===f ? t.primary : t.border}`, background: filter===f ? 'rgba(204,255,0,0.08)' : 'transparent', color: filter===f ? t.primary : t.textSub, fontSize:13, fontWeight:500, fontFamily:fonts.ui, cursor:'pointer', transition:'all 0.15s' }}>
             {f} {f !== 'All' && <span style={{ marginLeft:5, fontSize:11, opacity:0.7 }}>{bills.filter(b=> (connectionFilter==='All' || ((b.connection_id ?? b.connection_name) === connectionFilter)) && (typeFilter==='All' || (b.bill_type && b.bill_type.toLowerCase()===typeFilter.toLowerCase())) && b.status===f).length}</span>}
           </button>
         ))}

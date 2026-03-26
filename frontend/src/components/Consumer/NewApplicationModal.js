@@ -1,51 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import Select from 'react-select';
 import { useAuth } from '../../context/AuthContext';
-import { fonts, utilities } from '../../theme';
-import { ConnectionIcon, ElectricityIcon, WaterIcon, GasIcon } from '../../Icons';
 
-const UTIL_ICONS = { electricity: ElectricityIcon, water: WaterIcon, gas: GasIcon };
-
-const ModalField = ({ label, t, children }) => (
-  <div style={{ marginBottom: 16 }}>
-    <label style={{ fontSize: 12, fontWeight: 500, color: t.textSub, display: 'block', marginBottom: 7 }}>{label}</label>
-    {children}
-  </div>
-);
-
-export const createReactSelectStyles = (t, isDark, fonts) => ({
-  control: provided => ({
-    ...provided,
-    height: 44,
-    borderRadius:10,
-    border:`1.5px solid ${t.border}`,
-    background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'
-  }),
-  singleValue: provided => ({ ...provided, color: t.text, fontSize: 13, fontFamily: fonts.ui }),
-  placeholder: provided => ({ ...provided, fontSize: 13, fontFamily: fonts.ui }),
-  menu: provided => ({ ...provided, zIndex: 9999, background: t.bgCard, color: t.text }),
-  menuList: provided => ({
-    ...provided,
-    maxHeight: 140,
-    padding: 0,
-    background: isDark ? 'rgba(59,111,255,0.03)' : '#F5F8FF',
-    color: t.text,
-    fontSize: 13,
-    fontFamily: fonts.ui,
-  }),
-  option: (provided, state) => ({
-    ...provided,
-    background: state.isFocused || state.isSelected
-      ? (isDark ? 'rgba(59,111,255,0.08)' : '#E8F0FF')
-      : 'transparent',
-    color: t.text,
-    fontSize: 13,
-    fontFamily: fonts.ui,
-    cursor: 'pointer',
-  }),
-});
-
-const NewApplicationModal = ({ onClose, onSuccess, t, isDark }) => {
+const NewApplicationModal = ({ onClose, onSuccess }) => {
   const { authFetch } = useAuth();
   const [form, setForm] = useState({ requested_connection_type: 'Residential', region_id: '', address: '', utility_id: '', priority: 'Normal' });
   const [loading, setLoading] = useState(false);
@@ -54,7 +11,7 @@ const NewApplicationModal = ({ onClose, onSuccess, t, isDark }) => {
   const [myAddress, setMyAddress] = useState('');
   const [regions, setRegions] = useState([]);
   const [utility_type, setUtilityType] = useState('electricity');
-  const [utilities, setUtilities] = useState([]);
+  const [utilitiesList, setUtilitiesList] = useState([]);
   const [useMyAddress, setUseMyAddress] = useState(false);
 
   const handleUseMyAddress = async (checked) => {
@@ -63,7 +20,7 @@ const NewApplicationModal = ({ onClose, onSuccess, t, isDark }) => {
       if (myRegion) await fetchUtilities(myRegion);
     } else {
       setForm(f => ({ ...f, region_id: '', address: '', utility_id: '' }));
-      setUtilities([]);
+      setUtilitiesList([]);
     }
   };
 
@@ -74,8 +31,10 @@ const NewApplicationModal = ({ onClose, onSuccess, t, isDark }) => {
     setLoading(true); setError('');
     try {
       const res = await authFetch('/api/consumer/applications', { method: 'POST', body: JSON.stringify(form) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error);
+      }
       onSuccess();
     } catch (err) {
       setError(err.message || 'Failed to submit application');
@@ -84,170 +43,207 @@ const NewApplicationModal = ({ onClose, onSuccess, t, isDark }) => {
     }
   };
 
-	const fetchAll = useCallback(async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
       const [regRes, meRes] = await Promise.all([
         authFetch(`/api/public/regions`),
-        authFetch(`/api/profile/me`),
+        authFetch(`/api/consumer/profile`), // Updated to match /profile endpoint
       ]);
       const regData = await regRes.json();
-      if (!regRes.ok) throw new Error(regData.error);
       const meData = await meRes.json();
-      if (!meRes.ok) throw new Error(meData.error);
       setRegions(regData);
       setMyRegion(meData.region_id);
       setMyAddress(meData.house_num + ', ' + meData.street_name + (meData.landmark ? `, ${meData.landmark}` : ''));
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
-	}, [authFetch]);
+  }, [authFetch]);
 
   const fetchUtilities = useCallback(async (reg_id) => {
     setLoading(true);
     try {
-    const res  = await authFetch(`/api/public/utility-names/${reg_id}`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
-    setUtilities(data);
+      const res  = await authFetch(`/api/public/utility-names/${reg_id}`);
+      const data = await res.json();
+      setUtilitiesList(data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
-	}, [authFetch]);
+  }, [authFetch]);
 
-	useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const selectStyle = {
-    width: '100%', padding: '10px 12px', borderRadius: 10,
-    border: `1.5px solid ${t.border}`,
-    background: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFF',
-    color: t.text, fontSize: 13, fontFamily: fonts.ui, outline: 'none', cursor: 'pointer',
+  const customSelectStyles = {
+    control: (base, state) => ({
+      ...base,
+      background: 'rgba(255, 255, 255, 0.03)',
+      borderColor: state.isFocused ? 'rgba(204, 255, 0, 0.4)' : 'rgba(255, 255, 255, 0.05)',
+      borderRadius: '16px',
+      padding: '4px',
+      color: 'white',
+      '&:hover': {
+        borderColor: 'rgba(255, 255, 255, 0.1)'
+      }
+    }),
+    menu: (base) => ({
+      ...base,
+      background: '#1A1A1A',
+      borderRadius: '16px',
+      border: '1px solid rgba(255, 255, 255, 0.05)',
+      overflow: 'hidden'
+    }),
+    option: (base, state) => ({
+      ...base,
+      background: state.isFocused ? 'rgba(204, 255, 0, 0.1)' : 'transparent',
+      color: state.isFocused ? '#CCFF00' : 'rgba(255,255,255,0.6)',
+      fontSize: '13px',
+      padding: '12px 16px',
+      cursor: 'pointer'
+    }),
+    singleValue: (base) => ({
+      ...base,
+      color: 'white',
+      fontSize: '14px'
+    }),
+    placeholder: (base) => ({
+      ...base,
+      color: 'rgba(255,255,255,0.2)',
+      fontSize: '14px'
+    })
   };
 
   const regionOptions = regions.map(r => ({ value: r.region_id, label: r.region_name }));
-  const utilityOptions = utilities
+  const utilityOptions = utilitiesList
     .filter(u => ((u.utility_type || '').toLowerCase() === utility_type))
-    .map(u => ({ value: u.utility_id, label: `${u.utility_name}` }));
-  const selectStyles = createReactSelectStyles(t, isDark, fonts);
+    .map(u => ({ value: u.utility_id, label: u.utility_name }));
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
-      <div style={{ background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: 20, padding: 28, width: '100%', maxWidth: 460 }} onClick={e => e.stopPropagation()}>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg,#3B6FFF,#00C4FF)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(59,111,255,0.35)' }}>
-            <ConnectionIcon size={20} color="#fff" />
-          </div>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: t.text }}>New Connection Application</div>
-            <div style={{ fontSize: 12, color: t.textSub, marginTop: 2 }}>Submit a request for a new utility connection</div>
-          </div>
-          <button onClick={onClose} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: t.textMuted, fontSize: 22, lineHeight: 1 }}>×</button>
+    <div className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in font-dm" onClick={onClose}>
+      <div className="bg-bg border border-white/10 w-full max-w-[520px] rounded-[40px] p-10 shadow-2xl relative max-h-[90vh] overflow-y-auto no-scrollbar" onClick={e => e.stopPropagation()}>
+        
+        <div className="flex justify-between items-start mb-8">
+            <div>
+                <h2 className="text-2xl font-bold tracking-tight text-txt mb-1">New Connection</h2>
+                <p className="text-txt/30 text-xs font-mono uppercase tracking-widest">Application Form</p>
+            </div>
+            <button onClick={onClose} className="text-txt/20 hover:text-txt transition-colors text-2xl">✕</button>
         </div>
 
-        <ModalField label="Utility Type" t={t}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            {['Electricity', 'Water', 'Gas'].map(u => {
-              const key = u.toLowerCase();
-              const col = utilities[key];
-              const Icon = UTIL_ICONS[key];
-              const active = utility_type === key;
-              return (
-                <button key={u} onClick={() => { setUtilityType(key); setForm(f => ({ ...f, utility_id: '' })); }} style={{ padding: '12px 8px', borderRadius: 12, border: `1.5px solid ${active ? 'transparent' : t.border}`, background: active ? col.gradient : 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, transition: 'all 0.15s', boxShadow: active ? `0 4px 14px ${col.glow}` : 'none' }}>
-                  <Icon size={18} color={active ? '#fff' : t.textSub} />
-                  <span style={{ fontSize: 12, fontWeight: 500, color: active ? '#fff' : t.textSub }}>{u}</span>
+        <div className="space-y-8">
+            {/* Utility Type Icons */}
+            <div>
+                <label className="text-[10px] font-mono uppercase tracking-widest text-txt/30 mb-4 block">1. Select Utility</label>
+                <div className="grid grid-cols-3 gap-3">
+                    {['Electricity', 'Water', 'Gas'].map(type => (
+                        <button
+                            key={type}
+                            onClick={() => { setUtilityType(type.toLowerCase()); setForm(f => ({ ...f, utility_id: '' })); }}
+                            className={`flex flex-col items-center gap-3 p-5 rounded-3xl border transition-all ${
+                                utility_type === type.toLowerCase() 
+                                ? 'bg-lime text-bg border-lime font-bold shadow-lg shadow-lime/10' 
+                                : 'bg-white/5 border-white/5 text-txt/40 hover:border-white/10'
+                            }`}
+                        >
+                            <span className="text-xl">{type === 'Electricity' ? '⚡' : type === 'Water' ? '💧' : '🔥'}</span>
+                            <span className="text-[10px] uppercase font-mono tracking-wider">{type}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Connection Type */}
+            <div>
+                <label className="text-[10px] font-mono uppercase tracking-widest text-txt/30 mb-4 block">2. Connection Details</label>
+                <div className="flex gap-3 mb-6">
+                    {['Residential', 'Commercial'].map(type => (
+                        <button
+                            key={type}
+                            onClick={() => setForm(f => ({ ...f, requested_connection_type: type }))}
+                            className={`flex-1 py-3.5 rounded-2xl border text-xs font-bold transition-all ${
+                                form.requested_connection_type === type 
+                                ? 'bg-white/10 text-txt border-lime/40' 
+                                : 'bg-white/5 border-white/5 text-txt/20'
+                            }`}
+                        >
+                            {type}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="space-y-4">
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
+                             <label className="text-[9px] font-mono uppercase tracking-widest text-txt/20 ml-1">Region</label>
+                             <label className="flex items-center gap-2 cursor-pointer group">
+                                <input 
+                                    type="checkbox" 
+                                    checked={useMyAddress} 
+                                    onChange={e => { setUseMyAddress(e.target.checked); handleUseMyAddress(e.target.checked); }}
+                                    className="accent-lime"
+                                />
+                                <span className="text-[10px] text-txt/20 group-hover:text-lime transition-colors">Use My Profile Address</span>
+                             </label>
+                        </div>
+                        <Select
+                            styles={customSelectStyles}
+                            options={regionOptions}
+                            value={regionOptions.find(o => o.value === form.region_id)}
+                            onChange={opt => {
+                                setForm(f => ({ ...f, region_id: opt?.value || '' }));
+                                if (opt?.value) fetchUtilities(opt.value);
+                            }}
+                            isDisabled={useMyAddress}
+                            placeholder="Search Region..."
+                        />
+                    </div>
+
+                    <div>
+                        <label className="text-[9px] font-mono uppercase tracking-widest text-txt/20 mb-2 block ml-1">Full Installation Address</label>
+                        <textarea
+                            value={form.address}
+                            onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
+                            disabled={useMyAddress}
+                            className={`w-full bg-white/[0.03] border rounded-2xl p-4 text-sm text-txt outline-none focus:border-lime/40 transition-all ${useMyAddress ? 'opacity-50 cursor-not-allowed' : 'border-white/5'}`}
+                            rows="3"
+                            placeholder="House, Street, Area..."
+                        ></textarea>
+                    </div>
+
+                    <div>
+                        <label className="text-[9px] font-mono uppercase tracking-widest text-txt/20 mb-2 block ml-1">Utility Provider</label>
+                        <Select
+                            styles={customSelectStyles}
+                            options={utilityOptions}
+                            value={utilityOptions.find(o => o.value === form.utility_id)}
+                            onChange={opt => setForm(f => ({ ...f, utility_id: opt?.value || '' }))}
+                            placeholder="Select Utility Provider..."
+                        />
+                    </div>
+
+                    <div>
+                        <label className="text-[9px] font-mono uppercase tracking-widest text-txt/20 mb-2 block ml-1">Urgency</label>
+                        <select 
+                            value={form.priority} 
+                            onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}
+                            className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-4 py-3.5 text-sm text-txt outline-none appearance-none"
+                        >
+                            <option value="Normal">Normal Processing</option>
+                            <option value="High">Priority Review</option>
+                            <option value="Urgent">Emergency Setup</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            {error && <p className="text-red-500 text-xs font-mono bg-red-500/10 p-4 rounded-2xl border border-red-500/20">{error}</p>}
+
+            <div className="flex gap-4 pt-4">
+                <button 
+                  disabled={loading}
+                  onClick={handleSubmit} 
+                  className="flex-[2] bg-lime text-bg font-bold py-4 rounded-2xl transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+                >
+                    {loading ? 'Processing...' : 'Submit Application'}
                 </button>
-              );
-            })}
-          </div>
-        </ModalField>
-
-        <ModalField label="Connection Type" t={t}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            {['Residential', 'Commercial'].map(type => (
-              <button key={type} onClick={() => setForm(f => ({ ...f, requested_connection_type: type }))} style={{ padding: '10px', borderRadius: 10, border: `1.5px solid ${form.requested_connection_type === type ? t.primary : t.border}`, background: form.requested_connection_type === type ? (isDark ? 'rgba(59,111,255,0.12)' : '#EEF2FF') : 'transparent', color: form.requested_connection_type === type ? t.primary : t.textSub, fontSize: 13, fontWeight: 500, fontFamily: fonts.ui, cursor: 'pointer', transition: 'all 0.15s' }}>
-                {type}
-              </button>
-            ))}
-          </div>
-        </ModalField>
-
-        <ModalField label="Region" t={t}>
-          <Select
-            options={regionOptions}
-            value={regionOptions.find(o => o.value === form.region_id) || null}
-            onChange={opt => {
-              const val = opt ? opt.value : '';
-              setForm(f => ({ ...f, region_id: val }));
-              if (val) fetchUtilities(val);
-            }}
-            isDisabled={useMyAddress}
-            isClearable
-            styles={{ ...selectStyles, background: useMyAddress ? (isDark ? 'rgba(255,255,255,0.02)' : '#F3F4F6') : selectStyle.background }}
-            menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
-            placeholder="Select region"
-          />
-        </ModalField>
-
-        <ModalField label="Installation Address" t={t}>
-          <textarea
-            rows={3}
-            value={form.address}
-            onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
-            disabled={useMyAddress}
-            placeholder="House number, street, landmark..."
-            style={{ ...selectStyle, resize: 'none', lineHeight: 1.5, background: useMyAddress ? (isDark ? 'rgba(255,255,255,0.02)' : '#F3F4F6') : selectStyle.background }}
-          />
-        </ModalField>
-
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 12, fontWeight: 500, color: t.textSub, display: 'block', marginBottom: 7 }} />
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={useMyAddress}
-              onChange={e => {
-                const checked = e.target.checked;
-                setUseMyAddress(checked);
-                handleUseMyAddress(checked);
-              }}
-            />
-            <span style={{ fontSize: 13, color: t.text, userSelect: 'none' }}>Use my address</span>
-          </label>
-        </div>
-
-        <ModalField label="Utility" t={t}>
-          <Select
-            options={utilityOptions}
-            value={utilityOptions.find(o => o.value === form.utility_id) || null}
-            onChange={opt => {
-              const val = opt ? opt.value : '';
-              setForm(f => ({ ...f, utility_id: val }));
-            }}
-            isClearable
-            styles={selectStyles}
-            menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
-            placeholder="Select utility"
-          />
-        </ModalField>
-
-        <ModalField label="Priority" t={t}>
-          <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))} style={selectStyle}>
-            <option value="Normal">Normal</option>
-            <option value="High">High</option>
-            <option value="Urgent">Urgent</option>
-          </select>
-        </ModalField>
-
-        {error && (
-          <div style={{ fontSize: 13, color: isDark ? '#F87171' : '#B91C1C', marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: isDark ? '#2D0C0C' : '#FEE2E2' }}>{error}</div>
-        )}
-
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: 10, border: `1.5px solid ${t.border}`, background: 'transparent', color: t.text, fontSize: 14, fontWeight: 500, fontFamily: fonts.ui, cursor: 'pointer' }}>
-            Cancel
-          </button>
-          <button onClick={handleSubmit} disabled={loading} style={{ flex: 2, padding: '12px', borderRadius: 10, border: 'none', background: loading ? t.textMuted : 'linear-gradient(135deg,#3B6FFF,#2952D9)', color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: fonts.ui, cursor: loading ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : '0 4px 16px rgba(59,111,255,0.3)' }}>
-            {loading ? 'Submitting...' : 'Submit Application'}
-          </button>
+            </div>
         </div>
       </div>
     </div>

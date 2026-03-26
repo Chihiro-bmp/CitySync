@@ -9,6 +9,7 @@ const adminRoutes    = require('./routes/admin');
 const consumerRoutes = require('./routes/consumer');
 const fieldworkerRoutes = require('./routes/fieldworker');
 const aiRoutes       = require('./routes/ai');
+const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -26,6 +27,7 @@ app.use('/api/admin',    adminRoutes);
 app.use('/api/consumer', consumerRoutes);
 app.use('/api/fieldworker', fieldworkerRoutes);
 app.use('/api/ai',       aiRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.get('/health', async (req, res) => {
   try {
@@ -36,6 +38,12 @@ app.get('/health', async (req, res) => {
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const http = require('http');
+const server = http.createServer(app);
+
+const { initSocket } = require('./socket');
+initSocket(server);
+
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });

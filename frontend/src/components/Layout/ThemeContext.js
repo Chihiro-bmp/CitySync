@@ -3,18 +3,21 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const ThemeContext = createContext(null);
 
 export const ThemeProvider = ({ children }) => {
-  const [mode, setMode] = useState(() => {
-    return localStorage.getItem('citysync_theme') || 'light';
-  });
+  // Use 'dark' as the only mode
+  const [mode] = useState('dark');
 
   useEffect(() => {
-    localStorage.setItem('citysync_theme', mode);
-    // Set data-theme on body so CSS can style native elements (selects, scrollbars)
-    document.body.setAttribute('data-theme', mode);
-  }, [mode]);
+    localStorage.setItem('citysync_theme', 'dark');
+    document.body.setAttribute('data-theme', 'dark');
+    // Ensure dark class is on html for tailwind darkMode: 'class'
+    document.documentElement.classList.add('dark');
+  }, []);
 
-  const toggle = () => setMode(m => m === 'light' ? 'dark' : 'light');
-  const isDark = mode === 'dark';
+  const toggle = () => {
+    console.warn('Theme toggle is disabled. CitySync is now dark only.');
+  };
+  
+  const isDark = true;
 
   return (
     <ThemeContext.Provider value={{ mode, toggle, isDark }}>

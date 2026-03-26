@@ -23,6 +23,8 @@ import MyConnections           from './components/Consumer/Myconnections';
 import ConnectionDetail        from './components/Consumer/ConnectionDetail';
 import Payments                from './components/Consumer/Payments';
 import Profile                 from './components/Profile';
+import Notifications           from './components/Consumer/Notifications';
+import LandingPage             from './components/LandingPage/LandingPage';
 
 // Employee pages
 import RegionList from './components/Regions/RegionList';
@@ -69,7 +71,7 @@ function App() {
             {/* Public */}
             <Route path="/login"    element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/"         element={<RootRedirect />} />
+            <Route path="/"         element={<LandingPage />} />
 
             {/* ── Consumer ── */}
             <Route path="/consumer/*" element={
@@ -86,6 +88,7 @@ function App() {
                     <Route path="applications" element={<ConnectionApplications />} />
                     <Route path="payments"     element={<Payments />} />
                     <Route path="profile"      element={<Profile />} />
+                    <Route path="notifications" element={<Notifications />} />
                     {/* TODO: payments */}
                     <Route path="*" element={<Navigate to="/consumer/dashboard" replace />} />
                   </Routes>

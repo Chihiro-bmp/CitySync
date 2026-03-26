@@ -2,51 +2,41 @@
 // Usage: import { tokens, utilities, statusColors, fonts, navItems } from '../theme';
 
 export const fonts = {
-  display: "'Syne', sans-serif",
+  display: "'Barlow Condensed', sans-serif",
   ui:      "'Outfit', sans-serif",
-  mono:    "'JetBrains Mono', monospace",
+  mono:    "'IBM Plex Mono', monospace",
+  rajdhani: "'Rajdhani', sans-serif",
+  jetbrains: "'JetBrains Mono', monospace",
+  dm:      "'DM Sans', sans-serif",
 };
 
-export const fontImport = `@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Syne:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap');`;
+export const fontImport = `@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@300;400;500&family=Rajdhani:wght@600;700&family=JetBrains+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');`;
 
 export const tokens = {
-  light: {
-    bg:           '#F5F6FA',
-    bgCard:       '#FFFFFF',
-    bgHover:      '#F0F4FF',
-    sidebar:      '#0B0F1C',
-    sidebarHover: '#151C30',
-    sidebarActive:'#1E2840',
-    border:       '#E4E8F0',
-    text:         '#0D1B2A',
-    textSub:      '#5A6A7A',
-    textMuted:    '#94A3B8',
-    primary:      '#3B6FFF',
-    primaryHover: '#2952D9',
-    success:      '#22C55E',
-    warning:      '#F5A623',
-    danger:       '#EF4444',
-    overlay:      'rgba(0,0,0,0.4)',
-  },
   dark: {
-    bg:           '#080C18',
-    bgCard:       '#0F1628',
-    bgHover:      '#1A2235',
-    sidebar:      '#060914',
-    sidebarHover: '#0D1425',
-    sidebarActive:'#132040',
-    border:       '#1A2235',
-    text:         '#EEF2FF',
-    textSub:      '#7A8BA0',
-    textMuted:    '#3D4F66',
-    primary:      '#4D7DFF',
-    primaryHover: '#6B95FF',
-    success:      '#22C55E',
-    warning:      '#F5A623',
-    danger:       '#EF4444',
-    overlay:      'rgba(0,0,0,0.65)',
+    bg:           '#0E0E0E',
+    bgCard:       '#151515',
+    bgHover:      '#1A1A1A',
+    sidebar:      '#0A0A0A',
+    sidebarHover: '#121212',
+    sidebarActive:'#181818',
+    border:       'rgba(255,255,255,0.06)',
+    text:         '#E8E8E8',
+    textSub:      'rgba(232,232,232,0.46)',
+    textMuted:    'rgba(232,232,232,0.22)',
+    primary:      '#CCFF00', // Lime
+    primaryHover: '#B8E600',
+    success:      '#CCFF00',
+    warning:      '#FF9900',
+    danger:       '#FF3B30',
+    overlay:      'rgba(6,6,6,0.76)',
+    lime:         '#CCFF00',
+    orange:       '#FF9900',
+    cyan:         '#00D4FF',
   },
 };
+// Alias dark as light so any remaining light refs don't break immediately
+tokens.light = tokens.dark;
 
 export const utilities = {
   electricity: { label: 'Electricity', gradient: 'linear-gradient(135deg,#F5A623,#FF5733)', glow: 'rgba(245,166,35,0.35)',  tag: 'electricity' },
@@ -197,7 +187,6 @@ export const navItems = {
     { label:'Dashboard',    path:'/consumer/dashboard',     icon:'home'       },
     { label:'Connections',  path:'/consumer/connections',   icon:'connection' },
     { label:'My Bills',     path:'/consumer/bills',         icon:'bill'       },
-    { label:'Payments',     path:'/consumer/payments',      icon:'payment'    },
     { label:'Usage',        path:'/consumer/usage',         icon:'usage'      },
     { label:'Applications', path:'/consumer/applications',  icon:'application' },
     { label:'Complaints',   path:'/consumer/complaints',    icon:'complaint'  },
