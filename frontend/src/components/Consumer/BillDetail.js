@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../Layout/ThemeContext';
 import { tokens, fonts, utilities, statusColors } from '../../theme';
-import { ElectricityIcon, WaterIcon, GasIcon, BillIcon } from '../../Icons';
+import { ElectricityIcon, WaterIcon, GasIcon, BillIcon, CheckCircle } from '../../Icons';
 import PayBillModal from './PayBillModal';
 
 const UtilIcons = { electricity: ElectricityIcon, water: WaterIcon, gas: GasIcon };
@@ -191,7 +191,7 @@ const BillDetail = ({ billId, onClose, onBillPaid }) => {
       )}
       {bill.status === 'Paid' && (
         <div style={{ textAlign:'center', padding:'14px', borderRadius:12, background: isDark ? '#0D2E1A' : '#DCFCE7', border:`1px solid ${isDark ? '#4ADE8033' : '#86EFAC'}`, color: isDark ? '#4ADE80' : '#16A34A', fontSize:14, fontWeight:500 }}>
-          ✓ This bill has been paid
+          <CheckCircle size={16} style={{ display:'inline', verticalAlign:'middle', marginRight:6 }} /> This bill has been paid
         </div>
       )}
 

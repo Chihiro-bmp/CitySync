@@ -78,6 +78,9 @@ const Profile = () => {
   const [requestField, setRequestField] = useState(null);
   const [toast, setToast]               = useState('');
   const fileRef = useRef(null);
+  const [pwdForm, setPwdForm] = useState({ current: '', next: '', confirm: '', error: '', loading: false });
+  const [deactivateForm, setDeactivateForm] = useState({ password: '', error: '', loading: false });
+  const [requestValue, setRequestValue] = useState('');
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
 
@@ -98,22 +101,80 @@ const Profile = () => {
   const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2_000_000) { showToast('Image too large. Max 2MB.'); return; }
+    if (file.size > 5_000_000) { showToast('Image too large. Max 5MB.'); return; }
     setAvtLoad(true);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const b64 = reader.result;
-      try {
-        const res  = await authFetch(`${apiBase}/avatar`, { method: 'PUT', body: JSON.stringify({ avatar_url: b64 }) });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-        setAvatar(b64);
-        setGlobalAvatar(b64);
-        showToast('Profile photo updated!');
-      } catch (err) { showToast(err.message || 'Upload failed'); }
-      finally       { setAvtLoad(false); }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET);
+
+      const cloudRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/upload`,
+        { method: 'POST', body: formData }
+      );
+      const cloudData = await cloudRes.json();
+      if (!cloudRes.ok || cloudData.error)
+        throw new Error(cloudData.error?.message || 'Upload to Cloudinary failed');
+
+      const imageUrl = cloudData.secure_url;
+
+      const res  = await authFetch(`${apiBase}/avatar`, {
+        method: 'PUT',
+        body: JSON.stringify({ avatar_url: imageUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setAvatar(imageUrl);
+      setGlobalAvatar(imageUrl);
+      showToast('Profile photo updated!');
+    } catch (err) {
+      showToast(err.message || 'Upload failed');
+    } finally {
+      setAvtLoad(false);
+    }
+  };
+
+  const handlePasswordSubmit = async () => {
+    if (!pwdForm.current || !pwdForm.next)
+      return setPwdForm(f => ({ ...f, error: 'All fields are required.' }));
+    if (pwdForm.next.length < 8)
+      return setPwdForm(f => ({ ...f, error: 'New password must be at least 8 characters.' }));
+    if (pwdForm.next !== pwdForm.confirm)
+      return setPwdForm(f => ({ ...f, error: 'New passwords do not match.' }));
+    setPwdForm(f => ({ ...f, loading: true, error: '' }));
+    try {
+      const res  = await authFetch(`${apiBase}/password`, {
+        method: 'PUT',
+        body: JSON.stringify({ current_password: pwdForm.current, new_password: pwdForm.next }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update password.');
+      setModal(null);
+      setPwdForm({ current: '', next: '', confirm: '', error: '', loading: false });
+      showToast('Password updated successfully!');
+    } catch (err) {
+      setPwdForm(f => ({ ...f, error: err.message, loading: false }));
+    }
+  };
+
+  const handleDeactivate = async () => {
+    if (!deactivateForm.password)
+      return setDeactivateForm(f => ({ ...f, error: 'Password is required to confirm.' }));
+    setDeactivateForm(f => ({ ...f, loading: true, error: '' }));
+    try {
+      const res  = await authFetch(`${apiBase}/deactivate`, {
+        method: 'PUT',
+        body: JSON.stringify({ password: deactivateForm.password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to deactivate account.');
+      setModal(null);
+      showToast('Account deactivated. Logging out...');
+      setTimeout(() => logout(), 1800);
+    } catch (err) {
+      setDeactivateForm(f => ({ ...f, error: err.message, loading: false }));
+    }
   };
 
   if (loading) return (
@@ -169,6 +230,28 @@ const Profile = () => {
               {avatarLoading ? '...' : '+'}
             </button>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+            {avatar && (
+              <button
+                onClick={async () => {
+                  setAvtLoad(true);
+                  try {
+                    const res = await authFetch(`${apiBase}/avatar`, { method: 'DELETE' });
+                    if (!res.ok) throw new Error('Failed to remove photo');
+                    setAvatar(null);
+                    setGlobalAvatar(null);
+                    showToast('Profile photo removed');
+                  } catch (err) {
+                    showToast(err.message || 'Remove failed');
+                  } finally {
+                    setAvtLoad(false);
+                  }
+                }}
+                className="absolute -bottom-2 -left-2 w-8 h-8 rounded-full bg-bg border-2 border-white/10 flex items-center justify-center text-txt/40 text-xs hover:text-red-400 hover:border-red-500/30 transition-all shadow-lg"
+                title="Remove photo"
+              >
+                ✕
+              </button>
+            )}
           </div>
 
           <div className="flex-1">
@@ -379,18 +462,20 @@ const Profile = () => {
               <div className="bg-bg border border-white/10 w-full max-w-[440px] rounded-[32px] p-8 shadow-2xl relative" onClick={e => e.stopPropagation()}>
                   <h3 className="text-xl font-bold mb-1 tracking-tight">Request {requestField.field} Change</h3>
                   <p className="text-txt/30 text-xs mb-8">An employee will review and update your records.</p>
-                  
+
                   <div className="space-y-6">
                       <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
                         <div className="text-[10px] uppercase font-mono tracking-widest text-txt/20 mb-1">Target Field Content</div>
                         <div className="text-sm font-medium">{requestField.currentValue}</div>
                       </div>
-                      
+
                       <div>
                         <label className="text-[10px] font-mono uppercase tracking-widest text-txt/30 mb-2 block ml-1 text-lime">Proposed Change</label>
-                        <textarea 
+                        <textarea
                             rows="2"
                             placeholder="Type new value here..."
+                            value={requestValue}
+                            onChange={e => setRequestValue(e.target.value)}
                             className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-lime/40 transition-all placeholder:text-txt/10"
                         />
                       </div>
@@ -402,6 +487,116 @@ const Profile = () => {
                   </div>
               </div>
           </div>
+      )}
+
+      {modal === 'password' && (
+        <div
+          role="dialog"
+          aria-label="Update password"
+          className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-md flex items-center justify-center p-6"
+          onClick={() => { setModal(null); setPwdForm({ current:'', next:'', confirm:'', error:'', loading:false }); }}
+        >
+          <div className="bg-bg border border-white/10 w-full max-w-[440px] rounded-[32px] p-8 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-xl font-bold mb-1 tracking-tight">Update Password</h3>
+            <p className="text-txt/30 text-xs mb-8">Choose a strong password of at least 8 characters.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-mono uppercase tracking-widest text-txt/30 mb-2 block">Current Password</label>
+                <input type="password" placeholder="Current password"
+                  value={pwdForm.current}
+                  onChange={e => setPwdForm(f => ({ ...f, current: e.target.value, error: '' }))}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-lime/40 transition-all placeholder:text-txt/10"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-mono uppercase tracking-widest text-txt/30 mb-2 block">New Password</label>
+                <input type="password" placeholder="New password"
+                  value={pwdForm.next}
+                  onChange={e => setPwdForm(f => ({ ...f, next: e.target.value, error: '' }))}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-lime/40 transition-all placeholder:text-txt/10"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-mono uppercase tracking-widest text-txt/30 mb-2 block">Confirm New Password</label>
+                <input type="password" placeholder="Confirm new password"
+                  value={pwdForm.confirm}
+                  onChange={e => setPwdForm(f => ({ ...f, confirm: e.target.value, error: '' }))}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-lime/40 transition-all placeholder:text-txt/10"
+                />
+              </div>
+              {pwdForm.error && (
+                <div className="text-[12px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5">
+                  {pwdForm.error}
+                </div>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => { setModal(null); setPwdForm({ current:'', next:'', confirm:'', error:'', loading:false }); }}
+                  className="flex-1 bg-white/5 border border-white/10 text-txt/60 font-medium py-3 rounded-xl hover:text-txt transition-all"
+                >Cancel</button>
+                <button
+                  onClick={handlePasswordSubmit}
+                  disabled={pwdForm.loading}
+                  className="flex-[2] bg-lime text-bg font-bold py-3 rounded-xl hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {pwdForm.loading ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal === 'deactivate' && (
+        <div
+          role="dialog"
+          aria-label="Deactivate account"
+          className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-md flex items-center justify-center p-6"
+          onClick={() => { setModal(null); setDeactivateForm({ password:'', error:'', loading:false }); }}
+        >
+          <div className="bg-bg border border-red-500/10 w-full max-w-[440px] rounded-[32px] p-8 shadow-2xl relative" onClick={e => e.stopPropagation()}>
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-red-500/40 rounded-t-[32px]" />
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold tracking-tight text-red-400">Deactivate Account</h3>
+            </div>
+            <p className="text-txt/30 text-xs mb-8 leading-relaxed">
+              This will suspend all active utility connections and requires admin reactivation. Enter your password to confirm.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-mono uppercase tracking-widest text-txt/30 mb-2 block">Confirm Password</label>
+                <input type="password" placeholder="Your current password"
+                  value={deactivateForm.password}
+                  onChange={e => setDeactivateForm(f => ({ ...f, password: e.target.value, error: '' }))}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-red-500/40 transition-all placeholder:text-txt/10"
+                />
+              </div>
+              {deactivateForm.error && (
+                <div className="text-[12px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5">
+                  {deactivateForm.error}
+                </div>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => { setModal(null); setDeactivateForm({ password:'', error:'', loading:false }); }}
+                  className="flex-1 bg-white/5 border border-white/10 text-txt/60 font-medium py-3 rounded-xl hover:text-txt transition-all"
+                >Cancel</button>
+                <button
+                  onClick={handleDeactivate}
+                  disabled={deactivateForm.loading || !deactivateForm.password}
+                  className="flex-[2] bg-red-500/80 text-white font-bold py-3 rounded-xl hover:bg-red-500 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {deactivateForm.loading ? 'Deactivating...' : 'Confirm Deactivation'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

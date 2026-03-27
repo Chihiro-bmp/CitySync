@@ -5,6 +5,7 @@ import {
 } from '../../services/api';
 import { useTheme } from '../Layout/ThemeContext';
 import { tokens, fonts } from '../../theme';
+import { X, Plus } from '../../Icons';
 
 const inputStyle = (t) => ({
   width: '100%', padding: '9px 12px', borderRadius: 8,
@@ -94,7 +95,7 @@ const CreateConnectionModal = ({ t, isDark, onClose, onSuccess }) => {
       <div style={{ background: t.bgCard, borderRadius: 16, padding: 28, width: 580, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', border: `1px solid ${t.border}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ margin: 0, color: t.text, fontSize: 17 }}>New Utility Connection</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: t.textSub, cursor: 'pointer', fontSize: 20 }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: t.textSub, cursor: 'pointer', display: 'flex', alignItems: 'center' }}><X size={18} /></button>
         </div>
 
         {loadingData ? (
@@ -248,9 +249,9 @@ const ConnectionsManager = () => {
         <h2 style={{ color: t.text, margin: 0 }}>Manage Connections</h2>
         <button
           onClick={() => setShowCreate(true)}
-          style={{ padding: '9px 18px', background: '#3B6FFF', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}
+          style={{ padding: '9px 18px', background: '#3B6FFF', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          + New Connection
+          <Plus size={14} /> New Connection
         </button>
       </div>
 

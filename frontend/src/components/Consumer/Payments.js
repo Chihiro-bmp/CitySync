@@ -221,7 +221,7 @@ const Payments = () => {
       {/* Toast */}
       {toast && (
         <div style={{ position: 'fixed', top: 80, right: 24, zIndex: 300, padding: '12px 20px', borderRadius: 12, background: isDark ? '#0D2E1A' : '#DCFCE7', border: `1px solid ${isDark ? '#4ADE8033' : '#86EFAC'}`, color: isDark ? '#4ADE80' : '#16A34A', fontSize: 13, fontWeight: 500, boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
-          ✓ {toast}
+          <CheckIcon /> {toast}
         </div>
       )}
 
@@ -272,7 +272,7 @@ const Payments = () => {
       ) : tab === 'methods' ? (
         methods.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '52px 0', color: t.textMuted }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>💳</div>
+            <div style={{ display:'flex', justifyContent:'center', marginBottom:12, opacity:0.3 }}><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
             <div style={{ fontSize: 14, fontWeight: 500, color: t.textSub, marginBottom: 6 }}>No payment methods saved</div>
             <div style={{ fontSize: 13, marginBottom: 20 }}>Add a method to pay bills faster</div>
             <button onClick={() => setShowAdd(true)}

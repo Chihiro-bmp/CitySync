@@ -236,6 +236,39 @@ router.put('/avatar', async (req, res) => {
   }
 });
 
+// DELETE /api/fieldworker/avatar
+router.delete('/avatar', async (req, res) => {
+  const cloudinary = require('cloudinary').v2;
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key:    process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+  try {
+    const result = await pool.query(
+      `SELECT avatar_url FROM account WHERE person_id = $1`,
+      [req.user.userId]
+    );
+    const currentUrl = result.rows[0]?.avatar_url;
+    if (currentUrl && currentUrl.includes('cloudinary.com')) {
+      const match = currentUrl.match(/\/upload\/(?:v\d+\/)?(.+?)\.[a-z]+$/i);
+      if (match) {
+        await cloudinary.uploader.destroy(match[1]).catch(err =>
+          console.warn('Cloudinary delete warning:', err.message)
+        );
+      }
+    }
+    await pool.query(
+      `UPDATE account SET avatar_url = NULL WHERE person_id = $1`,
+      [req.user.userId]
+    );
+    res.json({ message: 'Avatar removed' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to remove avatar' });
+  }
+});
+
 // PUT /api/fieldworker/password
 router.put('/password', async (req, res) => {
   const { current_password, new_password } = req.body;

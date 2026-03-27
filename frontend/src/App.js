@@ -38,6 +38,9 @@ import ComplaintsManager from './components/Employee/ComplaintsManager';
 import FieldWorkersList from './components/Employee/FieldWorkersList';
 import TariffsManager from './components/Employee/TariffsManager';
 import BillingManager from './components/Employee/BillingManager';
+import RevenueAnalytics    from './components/Employee/Analytics/RevenueAnalytics';
+import ProductivityDashboard from './components/Employee/Analytics/ProductivityDashboard';
+import RegionalHeatmap     from './components/Employee/Analytics/RegionalHeatmap';
 
 // Field Worker pages
 import MyJobs from './components/FieldWorker/MyJobs';
@@ -127,6 +130,10 @@ function App() {
                     <Route path="field-workers"    element={<FieldWorkersList />} />
                     <Route path="tariffs"          element={<TariffsManager />} />
                     <Route path="billing"          element={<BillingManager />} />
+                    <Route path="analytics"        element={<Navigate to="/employee/analytics/revenue" replace />} />
+                    <Route path="analytics/revenue"      element={<RevenueAnalytics />} />
+                    <Route path="analytics/productivity" element={<ProductivityDashboard />} />
+                    <Route path="analytics/regions"      element={<RegionalHeatmap />} />
                     <Route path="*" element={<Navigate to="/employee/dashboard" replace />} />
                   </Routes>
                 </Layout>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import NewApplicationModal from './NewApplicationModal';
+import { X, Check, Inbox } from '../../Icons';
 
 const STEPS = ['Pending', 'Review', 'Approved', 'Ready'];
 const stepIndex = (status) => {
@@ -33,9 +34,9 @@ const StatusTimeline = ({ status }) => {
                 } ${active ? 'ring-4 ring-lime/20 scale-110' : ''}`}
               >
                 {rejected && i === 0 ? (
-                  <span className="text-bg text-xs font-bold leading-none">✕</span>
+                  <X size={10} className="text-bg" strokeWidth={3} />
                 ) : done ? (
-                  <span className="text-bg text-[10px] font-bold leading-none text-black">✓</span>
+                  <Check size={10} className="text-bg" strokeWidth={3} />
                 ) : null}
               </div>
               <span className={`text-[9px] font-mono uppercase tracking-widest ${done ? 'text-lime' : 'text-txt/20'}`}>
@@ -158,7 +159,7 @@ const ConnectionApplications = () => {
 
       {success && (
         <div className="mb-8 p-4 rounded-2xl bg-lime/10 border border-lime/20 text-lime text-sm animate-fade-in flex items-center gap-3">
-           <span className="font-bold">✓</span> Application submitted successfully!
+           <Check size={16} className="shrink-0" /> Application submitted successfully!
         </div>
       )}
 
@@ -186,7 +187,7 @@ const ConnectionApplications = () => {
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-32 bg-white/[0.01] border border-dashed border-white/5 rounded-[40px]">
-           <div className="text-txt/10 text-6xl mb-6">∅</div>
+           <div className="flex justify-center mb-6 text-txt/10"><Inbox size={60} /></div>
            <p className="text-txt/40 text-lg mb-2 tracking-tight">No applications found</p>
            <p className="text-txt/20 text-xs uppercase tracking-widest font-mono">Try a different filter or submit a new request</p>
         </div>

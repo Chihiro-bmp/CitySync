@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../Layout/ThemeContext';
 import { tokens, fonts, utilities, statusColors } from '../../theme';
-import { ComplaintIcon, ElectricityIcon, WaterIcon, GasIcon } from '../../Icons';
+import { ComplaintIcon, ElectricityIcon, WaterIcon, GasIcon, CheckCircle } from '../../Icons';
 
 const UtilIcons = { electricity: ElectricityIcon, water: WaterIcon, gas: GasIcon };
 
@@ -180,6 +181,15 @@ const Complaints = () => {
   const [filter, setFilter] = useState('All');
   const [success, setSuccess] = useState(false);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setShowModal(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -231,7 +241,7 @@ const Complaints = () => {
       {/* Success toast */}
       {success && (
         <div style={{ padding: '13px 18px', borderRadius: 12, marginBottom: 20, background: isDark ? '#0D2E1A' : '#DCFCE7', border: `1px solid ${isDark ? '#4ADE8033' : '#86EFAC'}`, color: isDark ? '#4ADE80' : '#16A34A', fontSize: 13, fontWeight: 500 }}>
-          ✓ Complaint submitted successfully. We'll look into it shortly.
+          <CheckCircle size={14} style={{ display:'inline', verticalAlign:'middle', marginRight:6 }} /> Complaint submitted successfully. We'll look into it shortly.
         </div>
       )}
 

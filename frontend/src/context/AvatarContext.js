@@ -14,7 +14,7 @@ export const AvatarProvider = ({ children }) => {
       const res  = await authFetch('/api/consumer/profile');
       if (!res.ok) return;
       const data = await res.json();
-      setAvatar(data.avatar_b64 || null);
+      setAvatar(data.avatar_url || null);
     } catch {
       // non-consumer roles won't have this endpoint — silently ignore
     }

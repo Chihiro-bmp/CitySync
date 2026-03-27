@@ -1,17 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../Layout/ThemeContext';
-import { tokens, fonts, utilities, statusColors } from '../../theme';
-import { ElectricityIcon, WaterIcon, GasIcon, ConnectionIcon } from '../../Icons';
+import { tokens, fonts, statusColors } from '../../theme';
+import { ConnectionIcon, Plus, Zap, Flame, Droplets } from '../../Icons';
 
-const UTIL_ICONS  = { electricity: ElectricityIcon, water: WaterIcon, gas: GasIcon };
+const UTIL_CONFIG = {
+  electricity: { Icon: Zap,      color: '#CCFF00', gradient: 'linear-gradient(135deg,#CCFF00,#99CC00)', glow: 'rgba(204,255,0,0.25)'  },
+  water:       { Icon: Droplets, color: '#00D4FF', gradient: 'linear-gradient(135deg,#00D4FF,#0099BB)', glow: 'rgba(0,212,255,0.25)'  },
+  gas:         { Icon: Flame,    color: '#FF9900', gradient: 'linear-gradient(135deg,#FF9900,#CC7700)', glow: 'rgba(255,153,0,0.25)'  },
+};
 
 // ── Connection Card ───────────────────────────────────────────────────────────
 const ConnectionCard = ({ conn, t, isDark, onOpen }) => {
   const utilKey = conn.utility_tag;
-  const util    = utilities[utilKey] || utilities.electricity;
-  const Icon    = UTIL_ICONS[utilKey]  || ElectricityIcon;
+  const util    = UTIL_CONFIG[utilKey] || UTIL_CONFIG.electricity;
+  const Icon    = util.Icon;
   const sc      = statusColors[conn.connection_status] || statusColors['Inactive'];
   const connectionName = conn.connection_name || conn.utility_name;
 
@@ -40,7 +44,7 @@ const ConnectionCard = ({ conn, t, isDark, onOpen }) => {
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
           <div style={{ width:42, height:42, borderRadius:13, background:util.gradient, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:`0 4px 12px ${util.glow}`, flexShrink:0 }}>
-            <Icon size={20} color="#fff" />
+            <Icon size={20} color="#000" />
           </div>
           <div>
             <div style={{ fontSize:15, fontWeight:600, color:t.text, textTransform:'capitalize' }}>{connectionName}</div>
@@ -150,7 +154,7 @@ const MyConnections = () => {
           onClick={() => navigate('/consumer/applications')}
           style={{ display:'flex', alignItems:'center', gap:8, padding:'11px 20px', borderRadius:12, border:'none', background:'#CCFF00', color:'#0E0E0E', fontSize:14, fontWeight:600, fontFamily:fonts.ui, cursor:'pointer', boxShadow:'0 4px 16px rgba(204,255,0,0.25)', whiteSpace:'nowrap' }}
         >
-          <span style={{ fontSize:18, lineHeight:1 }}>+</span> New Connection
+          <Plus size={16} /> New Connection
         </button>
       </div>
 

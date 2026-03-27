@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { X, Zap, Droplets, Flame } from '../../Icons';
 import Select from 'react-select';
 import { useAuth } from '../../context/AuthContext';
 
@@ -124,7 +125,7 @@ const NewApplicationModal = ({ onClose, onSuccess }) => {
                 <h2 className="text-2xl font-bold tracking-tight text-txt mb-1">New Connection</h2>
                 <p className="text-txt/30 text-xs font-mono uppercase tracking-widest">Application Form</p>
             </div>
-            <button onClick={onClose} className="text-txt/20 hover:text-txt transition-colors text-2xl">✕</button>
+            <button onClick={onClose} className="text-txt/20 hover:text-txt transition-colors"><X size={20} /></button>
         </div>
 
         <div className="space-y-8">
@@ -142,7 +143,7 @@ const NewApplicationModal = ({ onClose, onSuccess }) => {
                                 : 'bg-white/5 border-white/5 text-txt/40 hover:border-white/10'
                             }`}
                         >
-                            <span className="text-xl">{type === 'Electricity' ? '⚡' : type === 'Water' ? '💧' : '🔥'}</span>
+                            {type === 'Electricity' ? <Zap size={20} /> : type === 'Water' ? <Droplets size={20} /> : <Flame size={20} />}
                             <span className="text-[10px] uppercase font-mono tracking-wider">{type}</span>
                         </button>
                     ))}

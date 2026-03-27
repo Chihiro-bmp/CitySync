@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useAvatar } from '../../context/AvatarContext';
 import { 
   getConsumerProfile, 
   getConsumerConnections, 
@@ -83,6 +84,7 @@ const BentoCard = ({
 
 const ConsumerDashboard = () => {
   const { user } = useAuth();
+  const { avatar: profileAvatar } = useAvatar();
   const navigate = useNavigate();
   const [hoveredRow, setHoveredRow] = useState({ r1: null, r2: null, r3: null });
   const hoverTimers = useRef({ r1: null, r2: null, r3: null });
@@ -222,12 +224,6 @@ const ConsumerDashboard = () => {
                 >
                   Check every usage →
                 </button>
-                <button
-                  className="font-mono text-[8.5px] tracking-widest uppercase px-3 py-2 rounded-md bg-transparent border border-white/15 text-txt/50 hover:border-white/30 hover:text-txt"
-                  onClick={() => navigate('/consumer/usage')}
-                >
-                  Download report →
-                </button>
               </>
             }
           />
@@ -260,12 +256,6 @@ const ConsumerDashboard = () => {
                 >
                   Check every usage →
                 </button>
-                <button
-                  className="font-mono text-[8.5px] tracking-widest uppercase px-3 py-2 rounded-md bg-transparent border border-white/15 text-txt/50 hover:border-white/30 hover:text-txt"
-                  onClick={() => navigate('/consumer/usage')}
-                >
-                  Set alert threshold →
-                </button>
               </>
             }
           />
@@ -276,7 +266,7 @@ const ConsumerDashboard = () => {
           <BentoCard 
             tag="latest bill"
             value={`৳ ${latestBill.total_amount}`}
-            sub={latestBill.bill_status === 'PAID' ? '● Paid' : '● Unpaid'}
+            sub={latestBill.bill_status === 'PAID' ? 'Paid' : 'Unpaid'}
             subColor={latestBill.bill_status === 'PAID' ? '#44ff99' : '#ff4444'}
             bgImage="https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=600&q=75"
             stripeColor="#FF9900"
@@ -294,7 +284,7 @@ const ConsumerDashboard = () => {
               <>
                 <div className="font-mono text-[8px] tracking-widest uppercase text-muted mb-2">billing</div>
                 <div className="text-[11.5px] leading-relaxed text-txt/65 mb-3">
-                  Download statements, review line items, and configure auto-payment from your bills page.
+                   Review line items, and configure payment from your bills page.
                 </div>
                 <button
                   className="font-mono text-[8.5px] tracking-widest uppercase px-3 py-2 rounded-md bg-orange text-bg font-medium mb-2 hover:opacity-80"
@@ -302,12 +292,7 @@ const ConsumerDashboard = () => {
                 >
                   Check every bill →
                 </button>
-                <button
-                  className="font-mono text-[8.5px] tracking-widest uppercase px-3 py-2 rounded-md bg-transparent border border-white/15 text-txt/50 hover:border-white/30 hover:text-txt"
-                  onClick={() => navigate('/consumer/bills')}
-                >
-                  Enable auto-pay →
-                </button>
+                
               </>
             }
           />
@@ -339,12 +324,6 @@ const ConsumerDashboard = () => {
                   onClick={() => navigate('/consumer/usage')}
                 >
                   Check every usage →
-                </button>
-                <button
-                  className="font-mono text-[8.5px] tracking-widest uppercase px-3 py-2 rounded-md bg-transparent border border-white/15 text-txt/50 hover:border-white/30 hover:text-txt"
-                  onClick={() => navigate('/consumer/usage')}
-                >
-                  Download report →
                 </button>
               </>
             }
@@ -380,7 +359,7 @@ const ConsumerDashboard = () => {
                 </button>
                 <button
                   className="font-mono text-[8.5px] tracking-widest uppercase px-3 py-2 rounded-md bg-transparent border border-white/15 text-txt/50 hover:border-white/30 hover:text-txt"
-                  onClick={() => navigate('/consumer/complaints')}
+                  onClick={() => navigate('/consumer/complaints?new=1')}
                 >
                   File new complaint →
                 </button>
@@ -440,7 +419,7 @@ const ConsumerDashboard = () => {
             value={user?.firstName + ' ' + user?.lastName}
             sub="Residential · Dhaka"
             subColor="rgba(232,232,232,0.36)"
-            bgImage="https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=600&q=75"
+            bgImage={profileAvatar || "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=600&q=75"}
             stripeColor="rgba(204,255,0,0.25)"
             onClick={() => navigate('/consumer/profile')}
             flexValue={
@@ -466,10 +445,7 @@ const ConsumerDashboard = () => {
                 </button>
                 <button
                   className="font-mono text-[8.5px] tracking-widest uppercase px-3 py-2 rounded-md bg-transparent border border-red-500/20 text-red-500/60 hover:border-red-500/40 hover:text-red-500"
-                  onClick={() => {
-                    const ok = window.confirm('Are you sure you want to deactivate your CitySync account? This will suspend all active connections.');
-                    if (ok) window.alert('Account deactivation request submitted.');
-                  }}
+                  onClick={() => navigate('/consumer/profile')}
                 >
                   Deactivate account →
                 </button>

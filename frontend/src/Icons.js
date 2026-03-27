@@ -210,6 +210,19 @@ export const UtilityIcons = {
   complaint:   ComplaintIcon,
 };
 
+// ── Re-exports from Lucide React ─────────────────────────────────────────────
+export {
+  Check,
+  CheckCircle,
+  X,
+  Plus,
+  Zap,
+  Droplets,
+  Flame,
+  FileText,
+  Inbox,
+} from 'lucide-react';
+
 // ── Nav icon map (key matches navItems icon string) ───────────────────────────
 export const NavIcons = {
   home:       HomeIcon,
